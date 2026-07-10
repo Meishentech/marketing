@@ -55,12 +55,14 @@
 6. `schema_v6_status.sql`：狀態改 5 種（含資料轉換＋新 check constraint，**已修正為可安全重跑**）
 7. `schema_v7_case_studies.sql`：`marketing_case_studies` 表 + `case-study-photos` storage bucket（**已修正為可安全重跑**）
 8. `schema_v8_tasks_budget.sql`：`marketing_campaigns` 新增 `midea_budget_code`／`payment_status`／`claim_status`／`flight_cost`；新表 `marketing_campaign_tasks`（任務/里程碑）、`marketing_campaign_budget_items`（預算明細）— **已執行成功**
+9. `schema_v9_documents.sql`：新表 `marketing_campaign_documents` + `campaign-documents` storage bucket，用於行銷案詳情頁文件附件（報價單、攤位設計圖、大會文件、廠商資料）。2026-07-10 已在正式 Supabase project 驗證可用。
 
-⚠️ v1~v8 全部已在正式 Supabase project 執行過並驗證成功。
+⚠️ v1~v9 全部已在正式 Supabase project 執行過並驗證成功。
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
 - 本次匯入腳本保留於 `scripts/import-campaign-details.mjs`，預設 dry-run；如需重跑，使用 authenticated 帳密或 service role key 執行 `node scripts/import-campaign-details.mjs --apply`，會先清除這些行銷案既有任務/預算明細再重新匯入，避免重複資料。
+- 2026-07-10 Codex 已執行 `scripts/seed-exhibition-oct2026.mjs --apply`，補齊既有「10月空調展」行銷案：開國報價 6 類預算彙總、7 筆關鍵任務/里程碑、vendors 加入「開國有限公司」、上傳 4 份文件附件（開國報價單、攤位設計 v1/v2、大會參展申請表）。第一次上傳因 Supabase Storage object key 含中文被拒絕，已修正腳本改用 ASCII 安全檔名後重跑成功。讀回驗證：任務 7 筆、預算明細 6 筆、預算合計 NTD 1,371,867、文件 4 筆。
 - **不做 Google Sheet 自動匯出**（尚未串接，需要 Google Sheets API service account 憑證，使用者尚未提供）
 - 文案自動生成**已改為使用者同意接受小額 Anthropic API 費用**（Claude Haiku，估計月費台幣幾十元等級），前提是「一律進草稿、絕不自動發布」的規則不可放寬
 - 每週文案排程若跑到「文章重複」會跳過該關鍵字，不會硬產出重複內容
@@ -72,6 +74,8 @@
 - [ ] 觀察每週自動文案品質，特別留意技術名詞是否被 AI 幻覺（例如 Modbus 曾被誤寫成 Mod875）
 - [ ] 若要做 Google Sheet 自動匯出，需要使用者提供 Google Cloud service account 憑證
 - [ ] 「預計規劃」「補助申請」兩個新狀態目前尚無真實資料落在裡面，待使用者實際分類既有/新增行銷案
+- [x] 套用 `schema_v9_documents.sql` 到正式 Supabase project，啟用行銷案文件附件資料表與 storage bucket
+- [x] 執行 `scripts/seed-exhibition-oct2026.mjs --apply`，把「10月空調展」預算、任務、廠商、附件寫入既有行銷案
 
 ## 未解決問題
-- 無
+- Supabase MCP 仍對 project `apgrclmrkarxlajmhnpa` 無操作權限；若未來需要資料庫操作，可使用 authenticated 帳密或 service role key 走本機腳本。

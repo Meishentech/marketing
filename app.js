@@ -23,6 +23,7 @@ let KEYWORDS = [];
 let CASES = [];
 let TASKS = [];
 let BUDGET_ITEMS = [];
+let DOCS = [];
 let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
@@ -30,10 +31,14 @@ let editDraftId = null;
 let editCaseId = null;
 let editTaskId = null;
 let editBudgetItemId = null;
+let editDocId = null;
 let detailCampaignId = null;
 let vendorRows = [];
 let pendingCoverFile = null;
 let currentCoverPath = null;
+let pendingDocFile = null;
+let currentDocPath = null;
+let currentDocFileName = null;
 
 // ── NAV ──
 async function nav(view){
@@ -393,6 +398,24 @@ function renderBudgetItemsBlock(items){
     </div>`;
 }
 
+function renderDocumentsBlock(docsWithUrl){
+  const rows = docsWithUrl.map(({ doc: d, url }) => `
+    <tr onclick="openDocModal('${d.id}')">
+      <td><span class="case-tag">${esc(d.doc_type)}</span></td>
+      <td class="tb-name">${esc(d.title)}${d.version_note ? `<span class="muted-text" style="margin-left:8px">${esc(d.version_note)}</span>` : ''}</td>
+      <td class="mono" style="white-space:nowrap">${fd(d.uploaded_at)}</td>
+      <td onclick="event.stopPropagation()">${url ? `<a href="${url}" target="_blank" rel="noopener">下載</a>` : '-'}</td>
+    </tr>`).join('');
+  return `
+    <div class="tw">
+      <table>
+        <thead><tr><th>類型</th><th>文件名稱</th><th>上傳日期</th><th>檔案</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${rows ? '' : '<div class="empty">尚無文件，點擊「＋ 新增文件」上傳報價單、設計圖等附件</div>'}
+    </div>`;
+}
+
 // ── CAMPAIGNS：詳情頁 ──
 async function campaignDetail(id){
   detailCampaignId = id;
@@ -402,6 +425,8 @@ async function campaignDetail(id){
   if (!c) { document.getElementById('vc').innerHTML = '<div class="empty">找不到此行銷案</div>'; return; }
   TASKS = await GET(`marketing_campaign_tasks?campaign_id=eq.${id}&order=seq.asc,created_at.asc`) || [];
   BUDGET_ITEMS = await GET(`marketing_campaign_budget_items?campaign_id=eq.${id}&order=seq.asc,created_at.asc`) || [];
+  DOCS = await GET(`marketing_campaign_documents?campaign_id=eq.${id}&order=uploaded_at.desc`) || [];
+  const docsWithUrl = await Promise.all(DOCS.map(async d => ({ doc: d, url: await getSignedUrl('campaign-documents', d.file_path) })));
 
   const execRate = c.budget ? Math.round((Number(c.actual_spend) || 0) / c.budget * 100) : 0;
   const hasTime = c.planned_start || c.planned_end || c.actual_start || c.actual_end;
@@ -482,6 +507,14 @@ async function campaignDetail(id){
           <button class="btn btn-outline btn-sm" onclick="openBudgetModal()">＋ 新增項目</button>
         </div>
         ${renderBudgetItemsBlock(BUDGET_ITEMS)}
+      </div>
+
+      <div class="card detail-block ff">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="kpi-label">文件附件</div>
+          <button class="btn btn-outline btn-sm" onclick="openDocModal()">＋ 新增文件</button>
+        </div>
+        ${renderDocumentsBlock(docsWithUrl)}
       </div>
     </div>`;
 }
@@ -573,6 +606,66 @@ async function delBudgetItem(){
   if (!confirm('確定刪除此預算項目？')) return;
   await DEL(`marketing_campaign_budget_items?id=eq.${editBudgetItemId}`);
   closeM('mbudget');
+  await campaignDetail(detailCampaignId);
+}
+
+function openDocModal(id){
+  editDocId = id || null;
+  const d = id ? DOCS.find(x => x.id === id) : null;
+  document.getElementById('dc-title-label').textContent = id ? '編輯文件' : '新增文件';
+  document.getElementById('dc-type').value = d?.doc_type || '報價單';
+  document.getElementById('dc-name').value = d?.title || '';
+  document.getElementById('dc-version').value = d?.version_note || '';
+  document.getElementById('dc-notes').value = d?.notes || '';
+  document.getElementById('dc-file').value = '';
+  pendingDocFile = null;
+  currentDocPath = d?.file_path || null;
+  currentDocFileName = d?.file_name || null;
+  document.getElementById('dc-file-current').innerHTML = currentDocFileName ? `<span class="muted-text">目前檔案：${esc(currentDocFileName)}</span>` : '';
+  document.getElementById('dc-delete').style.display = id ? '' : 'none';
+  openM('mdoc');
+}
+
+function onDocFilePick(input){
+  pendingDocFile = input.files[0] || null;
+  const el = document.getElementById('dc-file-current');
+  if (pendingDocFile) el.innerHTML = `<span class="muted-text">待上傳：${esc(pendingDocFile.name)}</span>`;
+}
+
+async function saveDocument(){
+  const title = document.getElementById('dc-name').value.trim();
+  if (!title) { alert('請輸入文件名稱'); return; }
+  if (!pendingDocFile && !currentDocPath) { alert('請選擇檔案'); return; }
+
+  let filePath = currentDocPath;
+  let fileName = currentDocFileName;
+  if (pendingDocFile) {
+    try { filePath = await uploadStorageFile('campaign-documents', pendingDocFile); }
+    catch (e) { alert('檔案上傳失敗：' + e.message); return; }
+    fileName = pendingDocFile.name;
+  }
+
+  const payload = {
+    campaign_id: detailCampaignId,
+    doc_type: document.getElementById('dc-type').value,
+    title,
+    version_note: document.getElementById('dc-version').value.trim() || null,
+    file_path: filePath,
+    file_name: fileName,
+    notes: document.getElementById('dc-notes').value.trim() || null
+  };
+  if (editDocId) await PATCH(`marketing_campaign_documents?id=eq.${editDocId}`, payload);
+  else await POST('marketing_campaign_documents', payload);
+  closeM('mdoc');
+  await campaignDetail(detailCampaignId);
+}
+
+async function delDocument(){
+  if (!editDocId) return;
+  if (!confirm('確定刪除此文件？')) return;
+  if (currentDocPath) await deleteStorageFile('campaign-documents', currentDocPath);
+  await DEL(`marketing_campaign_documents?id=eq.${editDocId}`);
+  closeM('mdoc');
   await campaignDetail(detailCampaignId);
 }
 

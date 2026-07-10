@@ -368,6 +368,33 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- 文件附件 modal -->
+<div class="mo" id="mdoc">
+  <div class="md">
+    <div class="mh"><div class="mt" id="dc-title-label">新增文件</div><button class="mc" onclick="closeM('mdoc')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1"><label class="fl">類型</label>
+          <select id="dc-type"><option>報價單</option><option>攤位設計圖</option><option>大會文件</option><option>廠商資料</option><option>其他</option></select>
+        </div>
+        <div class="fg1"><label class="fl">版本註記</label><input id="dc-version" placeholder="例如 v2 0709"></div>
+        <div class="fg1 ff"><label class="fl">文件名稱 *</label><input id="dc-name"></div>
+        <div class="fg1 ff"><label class="fl">備註</label><textarea id="dc-notes"></textarea></div>
+        <div class="fg1 ff">
+          <label class="fl">檔案</label>
+          <div id="dc-file-current" style="margin-bottom:8px"></div>
+          <input id="dc-file" type="file" onchange="onDocFilePick(this)">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-red" id="dc-delete" onclick="delDocument()">刪除</button>
+      <button class="btn btn-outline" onclick="closeM('mdoc')">取消</button>
+      <button class="btn btn-primary" onclick="saveDocument()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 文案 modal -->
 <div class="mo" id="mdraft">
   <div class="md">
