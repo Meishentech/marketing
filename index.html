@@ -250,14 +250,17 @@ tbody tr:last-child td{border-bottom:none}
         <div class="fg1"><label class="fl">實際開始</label><input id="cm-astart" type="date"></div>
         <div class="fg1"><label class="fl">實際結束</label><input id="cm-aend" type="date"></div>
         <div class="fg1"><label class="fl">負責人</label><input id="cm-owner"></div>
-        <div class="fg1"><label class="fl">負責單位</label>
+        <div class="fg1"><label class="fl">負責單位（主要配合單位）</label>
           <select id="cm-unit" onchange="onUnitSelectChange()"></select>
         </div>
         <div class="fg1 ff" id="cm-unit-new-wrap" style="display:none">
           <label class="fl">新單位名稱</label><input id="cm-unit-new" placeholder="輸入新的負責單位名稱">
         </div>
-        <div class="fg1"><label class="fl">配合單位</label><input id="cm-partner"></div>
-        <div class="fg1"><label class="fl">委託第三方</label><input id="cm-vendor"></div>
+        <div class="fg1 ff">
+          <label class="fl">負責公司（外包，可新增多筆）</label>
+          <div id="cm-vendors-list"></div>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;align-self:flex-start" onclick="addVendorRow()">＋ 新增外包公司</button>
+        </div>
         <div class="fg1 ff"><label class="fl">備註</label><textarea id="cm-notes"></textarea></div>
       </div>
     </div>

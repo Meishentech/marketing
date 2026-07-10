@@ -17,6 +17,7 @@ let _campaignView = 'list';
 let editCampaignId = null;
 let editDraftId = null;
 let detailCampaignId = null;
+let vendorRows = [];
 
 // ── NAV ──
 async function nav(view){
@@ -208,16 +209,13 @@ async function campaignDetail(id){
       </div>
 
       <div class="card detail-block">
-        <div class="kpi-label">負責單位</div>
+        <div class="kpi-label">負責單位<span class="muted-text" style="text-transform:none;letter-spacing:0"> · 主要配合單位</span></div>
         <div class="detail-text">${c.owner_unit ? esc(c.owner_unit) : '<span class="muted-text">尚未填寫</span>'}</div>
       </div>
 
       <div class="card detail-block ff">
-        <div class="kpi-label">合作資訊</div>
-        <div class="detail-timeline">
-          <div>${c.partner ? esc(c.partner) : '<span class="muted-text">無</span>'}<div class="muted-text" style="margin-top:2px">配合單位</div></div>
-          <div>${c.vendor ? esc(c.vendor) : '<span class="muted-text">無</span>'}<div class="muted-text" style="margin-top:2px">委託第三方</div></div>
-        </div>
+        <div class="kpi-label">負責公司<span class="muted-text" style="text-transform:none;letter-spacing:0"> · 外包合作對象</span></div>
+        <div class="detail-text">${(c.vendors && c.vendors.length) ? c.vendors.map(v => esc(v)).join('、') : '<span class="muted-text">尚未填寫</span>'}</div>
       </div>
 
       ${c.notes ? `<div class="card detail-block ff"><div class="kpi-label">備註</div><div class="detail-text">${esc(c.notes)}</div></div>` : ''}
@@ -235,6 +233,17 @@ function onUnitSelectChange(){
   else { wrap.style.display = 'none'; }
 }
 
+function renderVendorRows(){
+  const el = document.getElementById('cm-vendors-list');
+  el.innerHTML = vendorRows.map((v, i) => `
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input value="${esc(v)}" oninput="vendorRows[${i}]=this.value" placeholder="外包公司名稱" style="flex:1;padding:10px 12px;border-radius:3px;border:1.5px solid var(--line);font-size:15px;background:var(--paper)">
+      <button type="button" class="btn btn-red btn-sm" onclick="removeVendorRow(${i})">移除</button>
+    </div>`).join('') || '<div class="muted-text" style="font-size:13px">尚未新增外包公司</div>';
+}
+function addVendorRow(){ vendorRows.push(''); renderVendorRows(); }
+function removeVendorRow(i){ vendorRows.splice(i, 1); renderVendorRows(); }
+
 function openCampaignModal(id){
   editCampaignId = id || null;
   const c = id ? CAMPAIGNS.find(x => x.id === id) : null;
@@ -242,11 +251,11 @@ function openCampaignModal(id){
   document.getElementById('cm-name').value = c?.name || '';
   document.getElementById('cm-budget').value = c?.budget ?? '';
   document.getElementById('cm-actual').value = c?.actual_spend ?? '';
-  document.getElementById('cm-partner').value = c?.partner || '';
   document.getElementById('cm-purpose').value = c?.purpose || '';
   document.getElementById('cm-status').value = c?.status || '估價';
-  document.getElementById('cm-vendor').value = c?.vendor || '';
   document.getElementById('cm-owner').value = c?.owner || '';
+  vendorRows = Array.isArray(c?.vendors) ? [...c.vendors] : [];
+  renderVendorRows();
   document.getElementById('cm-pstart').value = c?.planned_start || '';
   document.getElementById('cm-pend').value = c?.planned_end || '';
   document.getElementById('cm-astart').value = c?.actual_start || '';
@@ -276,10 +285,9 @@ async function saveCampaign(){
     name,
     budget: document.getElementById('cm-budget').value || null,
     actual_spend: document.getElementById('cm-actual').value || null,
-    partner: document.getElementById('cm-partner').value.trim() || null,
     purpose: document.getElementById('cm-purpose').value.trim() || null,
     status: document.getElementById('cm-status').value,
-    vendor: document.getElementById('cm-vendor').value.trim() || null,
+    vendors: vendorRows.map(v => v.trim()).filter(Boolean),
     owner: document.getElementById('cm-owner').value.trim() || null,
     owner_unit: ownerUnit || null,
     planned_start: document.getElementById('cm-pstart').value || null,
@@ -313,8 +321,8 @@ function csvCell(v){
 }
 
 function exportCampaignsCSV(){
-  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '負責人', '負責單位', '配合單位', '委託第三方', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
-  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.owner, c.owner_unit, c.partner, c.vendor, c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
+  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
+  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
   const csv = [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
