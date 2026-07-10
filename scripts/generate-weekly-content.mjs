@@ -47,6 +47,16 @@ async function fetchNews(keyword) {
   });
 }
 
+// 產品資訊取自 www.mcttw.com.tw，若產品線異動請同步更新這裡，避免 AI 用到過時或捏造的規格
+const PRODUCT_REFERENCE = `
+- MagBoost Apex 磁懸浮變頻離心式冰水機（130~200RT）：低噪音可達70dB以下、精準溫控±0.1°C
+- MagBoost 磁懸浮變頻離心式冰水機（250~1800RT）：COP 6.4+、IPLV 10.7、10~100%寬域運轉
+- 變頻直驅離心式冰水機（250~1300RT）：無齒輪傳動設計，運轉穩定
+- AirBoost MAG 氣冷式磁懸浮離心冰水機：氣冷式設計，適合無水塔場景
+- 核心技術：磁懸浮軸承（無機械接觸、無摩擦損耗、100%無油設計、免潤滑油、無污染風險）、智慧群控（Modbus/BACnet，自動加減機策略、冷卻水溫優化）、預防性維護數據監控與故障預警
+- 主要應用場景：飯店旅宿、醫療院所、工業製程、機場設施
+`.trim();
+
 async function draftCopy(article, keyword) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -57,10 +67,19 @@ async function draftCopy(article, keyword) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      max_tokens: 500,
       messages: [{
         role: 'user',
-        content: `你是美昇舒適科技（磁懸浮冰水主機廠商）的行銷小編。根據以下新聞，寫一則 Facebook 貼文草稿（120-200字，口語、不浮誇、不捏造事實，可以自然帶到節能／磁浮冰水主機相關話題但不要硬置入）。只回傳貼文內容本身，不要加任何說明文字或標題符號。\n\n新聞標題：${article.title}\n新聞來源：${article.source}\n追蹤關鍵字：${keyword}`
+        content: `你是美昇舒適科技的行銷小編，撰寫用於 Facebook 的貼文草稿（150-220字，口語、不浮誇）。
+
+美昇舒適科技的產品線（只能引用以下真實資訊，絕對不可捏造規格、型號、數據或新聞中沒有的事實）：
+${PRODUCT_REFERENCE}
+
+請根據以下新聞寫一則貼文：先簡短呼應新聞內容，接著明確指出「因為這則新聞談到的情境或問題，美昇的哪一款產品／哪個技術特點是適合的解決方案」，並具體說明為什麼適合（依新聞情境挑最貼近的產品，不要每篇都套同一款）。如果新聞內容跟冰水主機／節能完全沾不上邊，可以只呼應新聞，不要硬拗產品置入。只回傳貼文內容本身，不要加任何說明文字、標題符號或前後綴。
+
+新聞標題：${article.title}
+新聞來源：${article.source}
+追蹤關鍵字：${keyword}`
       }]
     })
   });
