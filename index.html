@@ -36,9 +36,8 @@ h1,h2,.display{font-family:'Big Shoulders Display',sans-serif;font-weight:700;le
 #login-screen.hidden{display:none!important}
 .login-box{background:var(--panel);width:380px;box-shadow:0 24px 64px rgba(0,0,0,.4);border-top:4px solid var(--teal)}
 .login-inner{padding:38px 40px}
-.login-mark{display:flex;align-items:center;gap:12px;margin-bottom:22px}
-.login-ring{width:38px;height:38px;border-radius:50%;border:3px solid var(--ink);position:relative;flex-shrink:0}
-.login-ring::after{content:'';position:absolute;inset:9px;border-radius:50%;background:var(--teal)}
+.login-mark{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.brand-logo{height:46px;width:auto;flex-shrink:0}
 .login-title{font-family:'Big Shoulders Display',sans-serif;font-size:26px;font-weight:800;line-height:1;color:var(--ink)}
 .login-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--muted);margin-top:3px;text-transform:uppercase}
 .login-box label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;margin-top:16px}
@@ -52,11 +51,9 @@ h1,h2,.display{font-family:'Big Shoulders Display',sans-serif;font-weight:700;le
 /* ── Shell ── */
 #sidebar{width:216px;background:var(--ink);color:#fff;display:none;flex-direction:column;position:fixed;height:100vh;z-index:100}
 #main{margin-left:216px;flex:1;padding:28px 32px;min-height:100vh;display:none}
-.logo{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px}
-.logo-ring{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.5);position:relative;flex-shrink:0}
-.logo-ring::after{content:'';position:absolute;inset:6px;border-radius:50%;background:var(--teal)}
-.logo b{font-family:'Big Shoulders Display',sans-serif;font-size:16px;font-weight:700;letter-spacing:.01em;display:block;line-height:1.15}
-.logo small{display:block;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;color:#8496a0;margin-top:2px;text-transform:uppercase}
+.logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.brand-logo-sb{height:30px;width:auto;filter:brightness(0) invert(1)}
+.logo small{display:block;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:#8496a0;text-transform:uppercase}
 nav{flex:1;padding:14px 0}
 .ni{display:flex;align-items:center;gap:10px;padding:10px 20px;color:#9FB1AC;font-size:13px;cursor:pointer;border-left:3px solid transparent;font-weight:500}
 .ni::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.5;flex-shrink:0}
@@ -182,7 +179,7 @@ nav{flex:1;padding:14px 0}
   <div class="login-box">
     <div class="login-inner">
       <div class="login-mark">
-        <div class="login-ring"></div>
+        <img src="assets/logo.png" alt="美昇" class="brand-logo">
         <div>
           <div class="login-title">美昇舒適科技</div>
           <div class="login-sub">Marketing Ops Console</div>
@@ -200,8 +197,8 @@ nav{flex:1;padding:14px 0}
 
 <div id="sidebar">
   <div class="logo">
-    <div class="logo-ring"></div>
-    <div><b>美昇舒適科技</b><small>Marketing Ops</small></div>
+    <img src="assets/logo.png" alt="美昇" class="brand-logo-sb">
+    <small>美昇舒適科技 · Marketing Ops</small>
   </div>
   <nav>
     <div class="ni" data-view="dashboard" onclick="nav('dashboard')">總覽</div>
