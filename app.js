@@ -9,6 +9,7 @@ const STATUS_BADGE  = { '估價': 'ba', '進行中': 'bb', '結案': 'bg' };
 
 let CAMPAIGNS = [];
 let DRAFTS = [];
+let KEYWORDS = [];
 let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
@@ -21,6 +22,7 @@ async function nav(view){
   if (view === 'dashboard') await renderDashboard();
   else if (view === 'campaigns') await renderCampaignsPage();
   else if (view === 'drafts') await renderDraftsPage();
+  else if (view === 'news') await renderNewsPage();
 }
 
 // ── DASHBOARD ──
@@ -245,16 +247,16 @@ async function renderDraftsPage(){
     ${body}`;
 }
 
-function openDraftModal(id){
+function openDraftModal(id, prefill){
   editDraftId = id || null;
   const d = id ? DRAFTS.find(x => x.id === id) : null;
   document.getElementById('dm-title-label').textContent = id ? '編輯文案' : '新增文案';
   document.getElementById('dm-week').value = d?.week_start || mondayOf();
   document.getElementById('dm-campaign').innerHTML = '<option value="">（不指定行銷案）</option>' +
     CAMPAIGNS.map(c => `<option value="${c.id}" ${d?.campaign_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  document.getElementById('dm-title').value = d?.title || '';
+  document.getElementById('dm-title').value = d?.title || prefill?.title || '';
   document.getElementById('dm-content').value = d?.content || '';
-  document.getElementById('dm-source').value = d?.source_note || '';
+  document.getElementById('dm-source').value = d?.source_note || prefill?.source_note || '';
   document.getElementById('dm-status').value = d?.status || '草稿';
   document.getElementById('dm-delete').style.display = id ? '' : 'none';
   openM('mdraft');
@@ -298,6 +300,74 @@ async function copyWeek(week){
   const text = items.map(d => (d.title ? `【${d.title}】\n` : '') + d.content).join('\n\n---\n\n');
   await navigator.clipboard.writeText(text);
   alert('已複製整週文案，可貼到 Google Sheet 或 Facebook');
+}
+
+// ── 新聞蒐集 ──
+async function renderNewsPage(){
+  document.getElementById('vc').innerHTML = '<div class="loading">載入中...</div>';
+  KEYWORDS = await GET('marketing_news_keywords?order=created_at.asc') || [];
+  const groups = KEYWORDS.map(k => `
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-weight:700">🔍 ${esc(k.keyword)}</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="fetchNewsFor('${k.id}','${esc(k.keyword)}')">重新抓取</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="delKeyword('${k.id}')">刪除關鍵字</button>
+        </div>
+      </div>
+      <div id="news-${k.id}" style="font-size:12px;color:var(--muted)">尚未抓取，點擊「重新抓取」</div>
+    </div>`).join('');
+
+  document.getElementById('vc').innerHTML = `
+    <div class="ph">
+      <div><div class="pt">新聞蒐集</div><div class="ps">依關鍵字抓取 Google 新聞，供撰寫行銷文案參考</div></div>
+    </div>
+    <div class="card" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+      <input id="nk-input" placeholder="新增關鍵字" style="flex:1;padding:8px 11px;border-radius:7px;border:1px solid var(--border);font-size:13px">
+      <button class="btn btn-primary btn-sm" onclick="addKeyword()">＋ 新增</button>
+    </div>
+    ${groups || '<div style="text-align:center;padding:48px;color:var(--muted)">尚無關鍵字，請先新增</div>'}`;
+}
+
+async function addKeyword(){
+  const input = document.getElementById('nk-input');
+  const keyword = input.value.trim();
+  if (!keyword) return;
+  await POST('marketing_news_keywords', { keyword });
+  input.value = '';
+  await renderNewsPage();
+}
+
+async function delKeyword(id){
+  if (!confirm('確定刪除此關鍵字？')) return;
+  await DEL(`marketing_news_keywords?id=eq.${id}`);
+  await renderNewsPage();
+}
+
+async function fetchNewsFor(id, keyword){
+  const box = document.getElementById(`news-${id}`);
+  box.innerHTML = '抓取中...';
+  try{
+    const res = await fetch(`/api/news?q=${encodeURIComponent(keyword)}`);
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || '抓取失敗');
+    if (!data.items?.length) { box.innerHTML = '沒有找到相關新聞'; return; }
+    box.innerHTML = data.items.map(it => `
+      <div style="padding:8px 0;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;gap:10px;align-items:start">
+        <div style="flex:1;min-width:0">
+          <a href="${esc(it.link)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;color:var(--text)">${esc(it.title)}</a>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(it.source)}${it.pubDate ? ' · ' + esc(it.pubDate) : ''}</div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick='createDraftFromNews(${JSON.stringify(it.title)}, ${JSON.stringify(it.link)})'>＋ 建立文案草稿</button>
+      </div>`).join('');
+  } catch(e){
+    box.innerHTML = `<span style="color:var(--red)">抓取失敗：${esc(e.message)}</span>`;
+  }
+}
+
+async function createDraftFromNews(title, link){
+  CAMPAIGNS = await GET('marketing_campaigns?order=name.asc') || [];
+  openDraftModal(null, { title, source_note: link });
 }
 
 // ── MODAL ──
