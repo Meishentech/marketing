@@ -25,6 +25,7 @@ let TASKS = [];
 let BUDGET_ITEMS = [];
 let DOCS = [];
 let RISKS = [];
+let RISK_UPDATES = [];
 let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
@@ -70,10 +71,14 @@ function dval(s){
   return s ? new Date(`${s}T00:00:00`) : null;
 }
 
+function startOfToday(){
+  return dval(todayISO());
+}
+
 function daysUntil(s){
   const d = dval(s);
   if (!d) return null;
-  const today = dval(todayISO());
+  const today = startOfToday();
   return Math.ceil((d - today) / 86400000);
 }
 
@@ -153,6 +158,29 @@ function openDashboardRisks(risks){
   return risks.filter(r => r.show_on_dashboard !== false && r.status !== '已解決');
 }
 
+function latestRiskUpdate(riskId, updates = RISK_UPDATES){
+  return updates
+    .filter(u => u.risk_id === riskId)
+    .sort((a, b) => (dval(b.update_date) || new Date(b.created_at || 0)) - (dval(a.update_date) || new Date(a.created_at || 0)))[0] || null;
+}
+
+function riskFollowupLabel(risk, latest){
+  if (risk.status === '已解決') return '已解決';
+  const next = latest?.next_followup_date;
+  if (next && dval(next) < startOfToday()) return `追蹤逾期 ${fdFull(next)}`;
+  if (next) return `下次追蹤 ${fdFull(next)}`;
+  if (latest?.update_date) return `最近更新 ${fdFull(latest.update_date)}`;
+  return '尚無更新紀錄';
+}
+
+function riskNeedsUpdate(risk, latest){
+  if (risk.status === '已解決') return false;
+  if (!latest) return true;
+  if (latest.next_followup_date && dval(latest.next_followup_date) < startOfToday()) return true;
+  const last = dval(latest.update_date);
+  return !!last && (startOfToday() - last) > 7 * 24 * 60 * 60 * 1000;
+}
+
 // ── DASHBOARD ──
 async function renderDashboard(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
@@ -160,6 +188,7 @@ async function renderDashboard(){
   const dashboardTasks = await GET('marketing_campaign_tasks?select=id,campaign_id,task_name,planned_start,planned_end,status,completion_pct&order=planned_end.asc') || [];
   const dashboardBudgetItems = await GET('marketing_campaign_budget_items?select=id,campaign_id,item_name,budget_nature,amount_twd,quote_status&order=seq.asc') || [];
   const dashboardRisks = await safeGET('marketing_campaign_risks?select=id,campaign_id,risk_type,title,description,impact_level,owner,due_date,status,show_on_dashboard,resolution_note&order=due_date.asc,created_at.desc');
+  const dashboardRiskUpdates = await safeGET('marketing_campaign_risk_updates?select=id,risk_id,update_note,updated_by,update_date,next_followup_date,is_important,created_at&order=update_date.desc,created_at.desc');
   const total = CAMPAIGNS.length;
   const statusCounts = STATUS_ORDER.map(s => ({ status: s, count: CAMPAIGNS.filter(c => c.status === s).length }));
   const totalBudget = CAMPAIGNS.reduce((s, c) => s + (Number(c.budget) || 0), 0);
@@ -182,20 +211,21 @@ async function renderDashboard(){
   const openRisks = openDashboardRisks(dashboardRisks);
   const decisionRiskRows = openRisks
     .filter(r => r.risk_type === '補助請款' || r.impact_level === '高' || /決策|核定|確認|拍板/.test(`${r.title || ''}${r.description || ''}`))
-    .map(r => ({ r, c: campaignById[r.campaign_id] }))
+    .map(r => ({ r, c: campaignById[r.campaign_id], latest: latestRiskUpdate(r.id, dashboardRiskUpdates) }))
     .filter(x => x.c);
-  const decisions = decisionRiskRows.length ? decisionRiskRows : CAMPAIGNS
+  const decisions = decisionRiskRows.length ? decisionRiskRows.slice(0, 6) : CAMPAIGNS
     .map(c => ({ c, reasons: decisionReasons(c, dashboardTasks, dashboardBudgetItems) }))
     .filter(x => x.reasons.length)
     .slice(0, 6);
   const formalRiskRows = openRisks
-    .map(r => ({ r, c: campaignById[r.campaign_id] }))
+    .map(r => ({ r, c: campaignById[r.campaign_id], latest: latestRiskUpdate(r.id, dashboardRiskUpdates) }))
     .filter(x => x.c)
     .sort((a, b) => {
       const score = x => ({ '高': 3, '中': 2, '低': 1 }[x.r.impact_level] || 0);
-      return score(b) - score(a) || (dval(a.r.due_date) || 0) - (dval(b.r.due_date) || 0);
+      const stale = x => riskNeedsUpdate(x.r, x.latest) ? 1 : 0;
+      return stale(b) - stale(a) || score(b) - score(a) || (dval(a.r.due_date) || 0) - (dval(b.r.due_date) || 0);
     });
-  const risks = formalRiskRows.length ? formalRiskRows : CAMPAIGNS
+  const risks = formalRiskRows.length ? formalRiskRows.slice(0, 6) : CAMPAIGNS
     .map(c => ({ c, reasons: riskReasons(c, dashboardTasks, dashboardBudgetItems) }))
     .filter(x => x.reasons.length)
     .sort((a, b) => b.reasons.length - a.reasons.length)
@@ -237,14 +267,14 @@ async function renderDashboard(){
       </div>`;
     })
   ].slice(0, 8).join('') || '<div class="empty">未來 30 天沒有已排定的重點活動或任務</div>';
-  const decisionRows = decisions.map(({ c, reasons, r }) => `
+  const decisionRows = decisions.map(({ c, reasons, r, latest }) => `
     <div class="dash-alert" onclick="campaignDetail('${c.id}')">
-      <div><div class="dash-item-title">${esc(r?.title || c.name)}</div><div class="dash-item-sub">${esc(r ? `${c.name} · ${r.risk_type}${r.due_date ? ' · ' + fdFull(r.due_date) : ''}` : reasons.join('、'))}</div></div>
+      <div><div class="dash-item-title">${esc(r?.title || c.name)}</div><div class="dash-item-sub">${esc(r ? `${c.name} · ${r.risk_type} · ${riskFollowupLabel(r, latest)}` : reasons.join('、'))}</div></div>
       ${r ? riskImpactTag(r.impact_level) : tag(c.status)}
     </div>`).join('') || '<div class="empty">目前沒有明確待決策項目</div>';
-  const riskRows = risks.map(({ c, reasons, r }) => `
+  const riskRows = risks.map(({ c, reasons, r, latest }) => `
     <div class="dash-alert risk" onclick="campaignDetail('${c.id}')">
-      <div><div class="dash-item-title">${esc(r?.title || c.name)}</div><div class="dash-item-sub">${esc(r ? `${c.name} · ${r.risk_type}${r.due_date ? ' · ' + fdFull(r.due_date) : ''}` : reasons.join('、'))}</div></div>
+      <div><div class="dash-item-title">${esc(r?.title || c.name)}</div><div class="dash-item-sub">${esc(r ? `${c.name} · ${r.risk_type} · ${riskFollowupLabel(r, latest)}` : reasons.join('、'))}</div></div>
       ${r ? riskImpactTag(r.impact_level) : `<span class="mono dash-risk-count">${reasons.length}</span>`}
     </div>`).join('') || '<div class="empty">目前沒有高風險專案</div>';
   const categoryRows = categories.map(([name, amount]) => {
@@ -462,11 +492,12 @@ function renderRisksBlock(risks){
       <td>${riskStatusTag(r.status)}</td>
       <td>${esc(r.owner || '-')}</td>
       <td class="mono" style="white-space:nowrap">${fdFull(r.due_date)}</td>
+      <td>${esc(riskFollowupLabel(r, latestRiskUpdate(r.id)))}</td>
     </tr>`).join('');
   return `
     <div class="tw">
       <table>
-        <thead><tr><th>類型</th><th>事項</th><th>影響</th><th>狀態</th><th>負責人</th><th>到期日</th></tr></thead>
+        <thead><tr><th>類型</th><th>事項</th><th>影響</th><th>狀態</th><th>負責人</th><th>到期日</th><th>追蹤</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${rows ? '' : '<div class="empty">尚無風險或待決事項，點擊「＋ 新增事項」開始追蹤</div>'}
@@ -484,6 +515,9 @@ async function campaignDetail(id){
   BUDGET_ITEMS = await GET(`marketing_campaign_budget_items?campaign_id=eq.${id}&order=seq.asc,created_at.asc`) || [];
   DOCS = await GET(`marketing_campaign_documents?campaign_id=eq.${id}&order=uploaded_at.desc`) || [];
   RISKS = await safeGET(`marketing_campaign_risks?campaign_id=eq.${id}&order=due_date.asc,created_at.desc`);
+  RISK_UPDATES = RISKS.length
+    ? await safeGET(`marketing_campaign_risk_updates?or=(${RISKS.map(r => `risk_id.eq.${r.id}`).join(',')})&order=update_date.desc,created_at.desc`)
+    : [];
   const docsWithUrl = await Promise.all(DOCS.map(async d => ({ doc: d, url: await getSignedUrl('campaign-documents', d.file_path) })));
 
   const execRate = c.budget ? Math.round((Number(c.actual_spend) || 0) / c.budget * 100) : 0;
@@ -678,6 +712,7 @@ async function delBudgetItem(){
 function openRiskModal(id){
   editRiskId = id || null;
   const r = id ? RISKS.find(x => x.id === id) : null;
+  const latest = r ? latestRiskUpdate(r.id) : null;
   document.getElementById('rm-title').textContent = id ? '編輯風險／待決事項' : '新增風險／待決事項';
   document.getElementById('rm-type').value = r?.risk_type || '其他';
   document.getElementById('rm-name').value = r?.title || '';
@@ -689,7 +724,61 @@ function openRiskModal(id){
   document.getElementById('rm-dashboard').checked = r?.show_on_dashboard ?? true;
   document.getElementById('rm-resolution').value = r?.resolution_note || '';
   document.getElementById('rm-delete').style.display = id ? '' : 'none';
+  document.getElementById('rm-update-section').style.display = id ? '' : 'none';
+  document.getElementById('rm-update-note').value = '';
+  document.getElementById('rm-update-by').value = r?.owner || '';
+  document.getElementById('rm-update-date').value = todayISO();
+  document.getElementById('rm-next-date').value = latest?.next_followup_date || '';
+  document.getElementById('rm-update-important').checked = false;
+  renderRiskUpdates(id);
   openM('mrisk');
+}
+
+function renderRiskUpdates(riskId){
+  const box = document.getElementById('rm-updates-list');
+  if (!box) return;
+  const rows = RISK_UPDATES
+    .filter(u => u.risk_id === riskId)
+    .sort((a, b) => (dval(b.update_date) || new Date(b.created_at || 0)) - (dval(a.update_date) || new Date(a.created_at || 0)));
+  box.innerHTML = rows.map(u => `
+    <div style="padding:10px 0;border-top:1px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+        <div class="mono" style="font-size:12px;color:var(--muted)">${fdFull(u.update_date)}${u.updated_by ? ' · ' + esc(u.updated_by) : ''}</div>
+        ${u.is_important ? '<span class="tag tag-grant">重要</span>' : ''}
+      </div>
+      <div style="font-size:14px;line-height:1.6;margin-top:4px">${esc(u.update_note)}</div>
+      ${u.next_followup_date ? `<div class="muted-text" style="margin-top:4px">下次追蹤：<span class="mono">${fdFull(u.next_followup_date)}</span></div>` : ''}
+    </div>`).join('') || '<div class="empty" style="padding:12px 0">尚無追蹤紀錄</div>';
+}
+
+async function saveRiskUpdate(){
+  if (!editRiskId) return;
+  const note = document.getElementById('rm-update-note').value.trim();
+  if (!note) { alert('請輸入更新內容'); return; }
+  const payload = {
+    risk_id: editRiskId,
+    update_note: note,
+    updated_by: document.getElementById('rm-update-by').value.trim() || null,
+    update_date: document.getElementById('rm-update-date').value || todayISO(),
+    next_followup_date: document.getElementById('rm-next-date').value || null,
+    is_important: document.getElementById('rm-update-important').checked
+  };
+  try {
+    await POST('marketing_campaign_risk_updates', payload);
+    await PATCH(`marketing_campaign_risks?id=eq.${editRiskId}`, { updated_at: new Date().toISOString() });
+  } catch (e) {
+    alert('追蹤紀錄資料表尚未啟用，請先在 Supabase SQL Editor 執行 schema_v11_risk_updates.sql。');
+    return;
+  }
+  const fresh = await safeGET(`marketing_campaign_risk_updates?risk_id=eq.${editRiskId}&order=update_date.desc,created_at.desc`);
+  RISK_UPDATES = RISK_UPDATES.filter(u => u.risk_id !== editRiskId).concat(fresh);
+  document.getElementById('rm-update-note').value = '';
+  document.getElementById('rm-update-date').value = todayISO();
+  document.getElementById('rm-next-date').value = '';
+  document.getElementById('rm-update-important').checked = false;
+  renderRiskUpdates(editRiskId);
+  await campaignDetail(detailCampaignId);
+  openRiskModal(editRiskId);
 }
 
 async function saveRisk(){

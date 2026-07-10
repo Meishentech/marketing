@@ -1,7 +1,7 @@
 # 美昇舒適科技行銷平台 · 工作交接紀錄
 
 ## 最後更新
-- 日期：2026-07-10
+- 日期：2026-07-11
 - 執行裝置：M1（Claude Code / Codex）
 
 ## 部署與帳號資訊
@@ -20,6 +20,7 @@
 - **任務與里程碑**（子表 `marketing_campaign_tasks`）：詳情頁內可新增/編輯/刪除，含序號、任務名稱、負責人、預計時程、狀態（未開始/進行中/已完成/待確認）、完成率%，對應原本 Google Sheet 每個專案分頁裡的「執行項目與進度」WBS
 - **預算明細**（子表 `marketing_campaign_budget_items`）：詳情頁內可新增/編輯/刪除，逐項費用含台幣/RMB雙幣別、匯率、預算性質、報價狀態，自動加總合計，對應原本 Google Sheet 的「預算明細」表格
 - **風險與待決事項**（子表 `marketing_campaign_risks`）：詳情頁內可新增/編輯/刪除，含類型、事項描述、影響程度、負責人、到期日、狀態、是否顯示在 Dashboard、解決說明。Dashboard 優先顯示正式風險資料，若 v10 尚未套用或尚無資料，仍保留既有自動推導風險/待決策邏輯。
+- **待決事項追蹤紀錄**（子表 `marketing_campaign_risk_updates`）：點開待決事項後可新增追蹤紀錄，含更新內容、更新人、更新日期、下次追蹤日、重要標記。待決事項列表與 Dashboard 會顯示最近更新／下次追蹤／追蹤逾期狀態。
 - 時程圖（Gantt）toggle 切換（總表層級，畫的是專案起訖日一條橫槓，非任務層級）
 - 總表可「匯出 Excel」（CSV，Excel 可直接開，含新增的補助/請款欄位）
 - 狀態顏色沿用冷媒循環溫度隱喻：預計規劃(灰)/估價中(黃銅)/進行中(冷媒藍綠)/補助申請(鋼藍)/結案(深藍綠)
@@ -58,8 +59,9 @@
 8. `schema_v8_tasks_budget.sql`：`marketing_campaigns` 新增 `midea_budget_code`／`payment_status`／`claim_status`／`flight_cost`；新表 `marketing_campaign_tasks`（任務/里程碑）、`marketing_campaign_budget_items`（預算明細）— **已執行成功**
 9. `schema_v9_documents.sql`：新表 `marketing_campaign_documents` + `campaign-documents` storage bucket，用於行銷案詳情頁文件附件（報價單、攤位設計圖、大會文件、廠商資料）。2026-07-10 已在正式 Supabase project 驗證可用。
 10. `schema_v10_risks.sql`：新表 `marketing_campaign_risks`，用於正式追蹤行銷案風險與待決事項（預算、時程、廠商、原廠、素材、業務配合、補助請款等）。2026-07-10 已在正式 Supabase project 驗證可用（REST smoke test 建立/讀取/刪除成功）。
+11. `schema_v11_risk_updates.sql`：新表 `marketing_campaign_risk_updates`，用於記錄待決事項的每次追蹤更新、下次追蹤日與重要標記。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
 
-⚠️ v1~v10 全部已在正式 Supabase project 執行過並驗證成功。
+⚠️ v1~v10 全部已在正式 Supabase project 執行過並驗證成功；v11 尚待執行。
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
@@ -79,6 +81,7 @@
 - [x] 套用 `schema_v9_documents.sql` 到正式 Supabase project，啟用行銷案文件附件資料表與 storage bucket
 - [x] 執行 `scripts/seed-exhibition-oct2026.mjs --apply`，把「10月空調展」預算、任務、廠商、附件寫入既有行銷案
 - [x] 套用 `schema_v10_risks.sql` 到正式 Supabase project，啟用風險與待決事項正式資料表
+- [ ] 套用 `schema_v11_risk_updates.sql` 到正式 Supabase project，啟用待決事項追蹤紀錄資料表，並用 REST smoke test 建立/讀取/刪除驗證
 
 ## 未解決問題
 - Supabase MCP 仍對 project `apgrclmrkarxlajmhnpa` 無操作權限；若未來需要資料庫操作，可使用 authenticated 帳密或 service role key 走本機腳本。

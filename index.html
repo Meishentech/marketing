@@ -393,6 +393,22 @@ tbody tr:last-child td{border-bottom:none}
         </div>
         <div class="fg1 ff"><label class="fl">解決說明</label><textarea id="rm-resolution"></textarea></div>
       </div>
+      <div id="rm-update-section" style="display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="kpi-label">追蹤紀錄</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)"><input id="rm-update-important" type="checkbox" style="width:auto"> 重要更新</label>
+        </div>
+        <div class="fg">
+          <div class="fg1 ff"><label class="fl">更新內容</label><textarea id="rm-update-note" placeholder="例如 已詢問廠商，預計明天下午回覆"></textarea></div>
+          <div class="fg1"><label class="fl">更新人</label><input id="rm-update-by"></div>
+          <div class="fg1"><label class="fl">更新日期</label><input id="rm-update-date" type="date"></div>
+          <div class="fg1"><label class="fl">下次追蹤日</label><input id="rm-next-date" type="date"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button class="btn btn-outline btn-sm" onclick="saveRiskUpdate()">＋ 新增追蹤</button>
+        </div>
+        <div id="rm-updates-list" style="margin-top:12px"></div>
+      </div>
     </div>
     <div class="mf">
       <button class="btn btn-red" id="rm-delete" onclick="delRisk()">刪除</button>
