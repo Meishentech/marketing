@@ -266,6 +266,10 @@ tbody tr:last-child td{border-bottom:none}
         <div class="fg1"><label class="fl">實際花費</label><input id="cm-actual" type="number"></div>
         <div class="fg1"><label class="fl">美的預計補助</label><input id="cm-subsidy-planned" type="number"></div>
         <div class="fg1"><label class="fl">美的已核發補助</label><input id="cm-subsidy-received" type="number"></div>
+        <div class="fg1"><label class="fl">美的預算編號</label><input id="cm-midea-code" placeholder="例如 EVT00000072"></div>
+        <div class="fg1"><label class="fl">機票費用</label><input id="cm-flight" type="number"></div>
+        <div class="fg1"><label class="fl">付款狀態</label><input id="cm-payment-status" placeholder="例如 已付款給廠商／尚未匯款"></div>
+        <div class="fg1"><label class="fl">請款狀態</label><input id="cm-claim-status" placeholder="例如 已開立 Debit Note／尚未請款"></div>
         <div class="fg1"><label class="fl">預計開始</label><input id="cm-pstart" type="date"></div>
         <div class="fg1"><label class="fl">預計結束</label><input id="cm-pend" type="date"></div>
         <div class="fg1"><label class="fl">實際開始</label><input id="cm-astart" type="date"></div>
@@ -289,6 +293,57 @@ tbody tr:last-child td{border-bottom:none}
       <button class="btn btn-red" id="cm-delete" onclick="delCampaign()">刪除</button>
       <button class="btn btn-outline" onclick="closeM('mcampaign')">取消</button>
       <button class="btn btn-primary" onclick="saveCampaign()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 任務／里程碑 modal -->
+<div class="mo" id="mtask">
+  <div class="md">
+    <div class="mh"><div class="mt" id="tm-title">新增任務</div><button class="mc" onclick="closeM('mtask')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1"><label class="fl">序號</label><input id="tm-seq" type="number"></div>
+        <div class="fg1"><label class="fl">狀態</label>
+          <select id="tm-status"><option>未開始</option><option>進行中</option><option>已完成</option><option>待確認</option></select>
+        </div>
+        <div class="fg1 ff"><label class="fl">任務／里程碑名稱 *</label><input id="tm-name"></div>
+        <div class="fg1"><label class="fl">負責人</label><input id="tm-owner"></div>
+        <div class="fg1"><label class="fl">完成率（%）</label><input id="tm-pct" type="number" min="0" max="100"></div>
+        <div class="fg1"><label class="fl">預計開始</label><input id="tm-pstart" type="date"></div>
+        <div class="fg1"><label class="fl">預計完成</label><input id="tm-pend" type="date"></div>
+        <div class="fg1 ff"><label class="fl">預期產出</label><input id="tm-output"></div>
+        <div class="fg1 ff"><label class="fl">備註</label><textarea id="tm-notes"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-red" id="tm-delete" onclick="delTask()">刪除</button>
+      <button class="btn btn-outline" onclick="closeM('mtask')">取消</button>
+      <button class="btn btn-primary" onclick="saveTask()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 預算明細 modal -->
+<div class="mo" id="mbudget">
+  <div class="md">
+    <div class="mh"><div class="mt" id="bm-title">新增預算項目</div><button class="mc" onclick="closeM('mbudget')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1"><label class="fl">序號</label><input id="bm-seq" type="number"></div>
+        <div class="fg1"><label class="fl">預算性質</label><input id="bm-nature" placeholder="例如 已知／估算"></div>
+        <div class="fg1 ff"><label class="fl">費用項目 *</label><input id="bm-name"></div>
+        <div class="fg1"><label class="fl">台幣金額</label><input id="bm-twd" type="number"></div>
+        <div class="fg1"><label class="fl">匯率（TWD/RMB）</label><input id="bm-rate" type="number" step="0.01"></div>
+        <div class="fg1"><label class="fl">呈報金額（RMB）</label><input id="bm-rmb" type="number"></div>
+        <div class="fg1"><label class="fl">報價狀態</label><input id="bm-quote" placeholder="例如 已知／待報價／待拆價"></div>
+        <div class="fg1 ff"><label class="fl">依據／說明</label><textarea id="bm-basis"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-red" id="bm-delete" onclick="delBudgetItem()">刪除</button>
+      <button class="btn btn-outline" onclick="closeM('mbudget')">取消</button>
+      <button class="btn btn-primary" onclick="saveBudgetItem()">儲存</button>
     </div>
   </div>
 </div>

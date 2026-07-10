@@ -16,9 +16,11 @@
 
 ### 1. 行銷案管理
 - 總表只顯示專案名稱／執行狀態／預算，**自動依狀態分組排序**（預計規劃→估價中→進行中→補助申請→結案，同狀態內依建立時間新到舊）
-- 點擊進入詳情頁：專案說明／專案時間（預計+實際）／專案預算（含美的預計補助、已核發補助）／負責人／負責單位（主要配合單位，可＋新增）／負責公司（外包，可複數）／備註
-- 時程圖（Gantt）toggle 切換
-- 總表可「匯出 Excel」（CSV，Excel 可直接開）
+- 點擊進入詳情頁：專案說明／專案時間（預計+實際）／專案預算（含美的預計補助、已核發補助）／負責人／負責單位（主要配合單位，可＋新增）／負責公司（外包，可複數）／**補助與請款狀態**（美的預算編號、付款狀態、請款狀態、機票費用）／備註
+- **任務與里程碑**（子表 `marketing_campaign_tasks`）：詳情頁內可新增/編輯/刪除，含序號、任務名稱、負責人、預計時程、狀態（未開始/進行中/已完成/待確認）、完成率%，對應原本 Google Sheet 每個專案分頁裡的「執行項目與進度」WBS
+- **預算明細**（子表 `marketing_campaign_budget_items`）：詳情頁內可新增/編輯/刪除，逐項費用含台幣/RMB雙幣別、匯率、預算性質、報價狀態，自動加總合計，對應原本 Google Sheet 的「預算明細」表格
+- 時程圖（Gantt）toggle 切換（總表層級，畫的是專案起訖日一條橫槓，非任務層級）
+- 總表可「匯出 Excel」（CSV，Excel 可直接開，含新增的補助/請款欄位）
 - 狀態顏色沿用冷媒循環溫度隱喻：預計規劃(灰)/估價中(黃銅)/進行中(冷媒藍綠)/補助申請(鋼藍)/結案(深藍綠)
 
 ### 2. 新聞蒐集
@@ -52,8 +54,9 @@
 5. `schema_v5_subsidy.sql`：`subsidy_planned`、`subsidy_received`
 6. `schema_v6_status.sql`：狀態改 5 種（含資料轉換＋新 check constraint，**已修正為可安全重跑**）
 7. `schema_v7_case_studies.sql`：`marketing_case_studies` 表 + `case-study-photos` storage bucket（**已修正為可安全重跑**）
+8. `schema_v8_tasks_budget.sql`：`marketing_campaigns` 新增 `midea_budget_code`／`payment_status`／`claim_status`／`flight_cost`；新表 `marketing_campaign_tasks`（任務/里程碑）、`marketing_campaign_budget_items`（預算明細）— **尚未在正式 Supabase project 執行，需使用者手動到 Dashboard SQL Editor 跑一次**
 
-⚠️ 全部都已在正式 Supabase project 執行過並驗證成功。若要在新環境重建，依序執行 v1~v7 即可。
+⚠️ v1~v7 已在正式 Supabase project 執行過並驗證成功。**v8 是本次新增，尚未執行**，前端程式碼已經預期這兩張新表存在，執行前任務/預算明細區塊會因表不存在而讀取失敗（詳情頁其餘欄位不受影響）。
 
 ## 已知決策與限制
 - **不做 Google Sheet 自動匯出**（尚未串接，需要 Google Sheets API service account 憑證，使用者尚未提供）
@@ -62,6 +65,8 @@
 - 「10月空調展」等既有行銷案資料是從 Google Sheet《美昇舒適｜2026年行銷計畫預算進度管理表》匯入 14 筆＋更新 1 筆，匯入時上半年活動的「實際花費」照抄 sheet，下半年活動因為 sheet 備註寫「尚未執行」所以刻意留空未匯入實際花費/已核發補助
 
 ## 下一步待辦
+- [ ] **使用者需先到 Supabase Dashboard SQL Editor 執行 `schema_v8_tasks_budget.sql`**，前端已經在等這兩張表
+- [ ] 把原始 Google Sheet《美昇舒適｜2026年行銷計畫預算進度管理表》裡各專案分頁（商業週刊/遠見雜誌/0731台北技師公會/08高雄技師公會/11重慶訪廠/12感恩餐會）的「執行項目與進度」「預算明細」實際資料，逐筆用「任務與里程碑」「預算明細」UI 補進對應行銷案（目前只有總覽層級的 14+1 筆匯入過，細節層還是空的）
 - [ ] 使用者實際使用「成功案例」功能：貼原廠照片進 Claude 對話 → 翻譯整理 → Canva 出圖 → 存入案例庫
 - [ ] 觀察每週自動文案品質，特別留意技術名詞是否被 AI 幻覺（例如 Modbus 曾被誤寫成 Mod875）
 - [ ] 若要做 Google Sheet 自動匯出，需要使用者提供 Google Cloud service account 憑證

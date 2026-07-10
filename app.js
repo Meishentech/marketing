@@ -21,11 +21,15 @@ let CAMPAIGNS = [];
 let DRAFTS = [];
 let KEYWORDS = [];
 let CASES = [];
+let TASKS = [];
+let BUDGET_ITEMS = [];
 let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
 let editDraftId = null;
 let editCaseId = null;
+let editTaskId = null;
+let editBudgetItemId = null;
 let detailCampaignId = null;
 let vendorRows = [];
 let pendingCoverFile = null;
@@ -171,6 +175,57 @@ function renderCampaignGantt(){
     </div>`;
 }
 
+function taskStatusTag(status){
+  const cls = { '未開始': 'muted', '進行中': 'teal', '已完成': 'deep', '待確認': 'brass' }[status] || 'muted';
+  return `<span class="tag tag-${cls}">${esc(status)}</span>`;
+}
+
+function renderTasksBlock(tasks){
+  const rows = tasks.map(t => `
+    <tr onclick="openTaskModal('${t.id}')">
+      <td class="mono" style="width:36px">${t.seq ?? ''}</td>
+      <td class="tb-name">${esc(t.task_name)}</td>
+      <td>${esc(t.owner || '-')}</td>
+      <td class="mono" style="white-space:nowrap">${t.planned_start ? fd(t.planned_start) : '-'}${t.planned_end ? ' – ' + fd(t.planned_end) : ''}</td>
+      <td>${taskStatusTag(t.status)}</td>
+      <td style="min-width:100px">
+        <div class="kpi-bar" style="background:var(--line)"><i style="width:${Math.min(100, Number(t.completion_pct) || 0)}%;background:var(--teal)"></i></div>
+        <div class="muted-text mono" style="margin-top:3px">${Math.round(Number(t.completion_pct) || 0)}%</div>
+      </td>
+    </tr>`).join('');
+  return `
+    <div class="tw">
+      <table>
+        <thead><tr><th>#</th><th>任務／里程碑</th><th>負責人</th><th>預計時程</th><th>狀態</th><th>完成率</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${rows ? '' : '<div class="empty">尚無任務，點擊「＋ 新增任務」開始規劃</div>'}
+    </div>`;
+}
+
+function renderBudgetItemsBlock(items){
+  const rows = items.map(b => `
+    <tr onclick="openBudgetModal('${b.id}')">
+      <td class="mono" style="width:36px">${b.seq ?? ''}</td>
+      <td class="tb-name">${esc(b.item_name)}</td>
+      <td>${esc(b.budget_nature || '-')}</td>
+      <td class="mono tb-amt">NT$ ${fmt(b.amount_twd)}</td>
+      <td class="mono tb-amt">RMB ${fmt(b.amount_rmb)}</td>
+      <td>${esc(b.quote_status || '-')}</td>
+    </tr>`).join('');
+  const totalTwd = items.reduce((s, b) => s + (Number(b.amount_twd) || 0), 0);
+  const totalRmb = items.reduce((s, b) => s + (Number(b.amount_rmb) || 0), 0);
+  return `
+    <div class="tw">
+      <table>
+        <thead><tr><th>#</th><th>費用項目</th><th>性質</th><th>台幣金額</th><th>RMB金額</th><th>報價狀態</th></tr></thead>
+        <tbody>${rows}</tbody>
+        ${items.length ? `<tfoot><tr><td></td><td class="tb-name">合計</td><td></td><td class="mono tb-amt">NT$ ${fmt(totalTwd)}</td><td class="mono tb-amt">RMB ${fmt(totalRmb)}</td><td></td></tr></tfoot>` : ''}
+      </table>
+      ${rows ? '' : '<div class="empty">尚無預算明細，點擊「＋ 新增項目」開始建立</div>'}
+    </div>`;
+}
+
 // ── CAMPAIGNS：詳情頁 ──
 async function campaignDetail(id){
   detailCampaignId = id;
@@ -178,9 +233,12 @@ async function campaignDetail(id){
   let c = CAMPAIGNS.find(x => x.id === id);
   if (!c) { const r = await GET(`marketing_campaigns?id=eq.${id}`); c = r?.[0]; }
   if (!c) { document.getElementById('vc').innerHTML = '<div class="empty">找不到此行銷案</div>'; return; }
+  TASKS = await GET(`marketing_campaign_tasks?campaign_id=eq.${id}&order=seq.asc,created_at.asc`) || [];
+  BUDGET_ITEMS = await GET(`marketing_campaign_budget_items?campaign_id=eq.${id}&order=seq.asc,created_at.asc`) || [];
 
   const execRate = c.budget ? Math.round((Number(c.actual_spend) || 0) / c.budget * 100) : 0;
   const hasTime = c.planned_start || c.planned_end || c.actual_start || c.actual_end;
+  const hasSubsidyMeta = c.midea_budget_code || c.payment_status || c.claim_status || c.flight_cost != null;
 
   document.getElementById('vc').innerHTML = `
     <div class="ph">
@@ -232,8 +290,123 @@ async function campaignDetail(id){
         <div class="detail-text">${(c.vendors && c.vendors.length) ? c.vendors.map(v => esc(v)).join('、') : '<span class="muted-text">尚未填寫</span>'}</div>
       </div>
 
+      ${hasSubsidyMeta ? `
+      <div class="card detail-block">
+        <div class="kpi-label">補助與請款狀態</div>
+        ${c.midea_budget_code ? `<div class="detail-text" style="font-size:14px">美的預算編號　<span class="mono">${esc(c.midea_budget_code)}</span></div>` : ''}
+        ${c.payment_status ? `<div class="detail-text" style="font-size:14px;margin-top:4px">付款狀態　${esc(c.payment_status)}</div>` : ''}
+        ${c.claim_status ? `<div class="detail-text" style="font-size:14px;margin-top:4px">請款狀態　${esc(c.claim_status)}</div>` : ''}
+        ${c.flight_cost != null ? `<div class="detail-text" style="font-size:14px;margin-top:4px">機票費用　NT$ ${fmt(c.flight_cost)}</div>` : ''}
+      </div>` : ''}
+
       ${c.notes ? `<div class="card detail-block ff"><div class="kpi-label">備註</div><div class="detail-text">${esc(c.notes)}</div></div>` : ''}
+
+      <div class="card detail-block ff">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="kpi-label">任務與里程碑</div>
+          <button class="btn btn-outline btn-sm" onclick="openTaskModal()">＋ 新增任務</button>
+        </div>
+        ${renderTasksBlock(TASKS)}
+      </div>
+
+      <div class="card detail-block ff">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="kpi-label">預算明細</div>
+          <button class="btn btn-outline btn-sm" onclick="openBudgetModal()">＋ 新增項目</button>
+        </div>
+        ${renderBudgetItemsBlock(BUDGET_ITEMS)}
+      </div>
     </div>`;
+}
+
+function openTaskModal(id){
+  editTaskId = id || null;
+  const t = id ? TASKS.find(x => x.id === id) : null;
+  document.getElementById('tm-title').textContent = id ? '編輯任務' : '新增任務';
+  document.getElementById('tm-seq').value = t?.seq ?? (TASKS.length ? Math.max(...TASKS.map(x => x.seq || 0)) + 1 : 1);
+  document.getElementById('tm-name').value = t?.task_name || '';
+  document.getElementById('tm-owner').value = t?.owner || '';
+  document.getElementById('tm-pstart').value = t?.planned_start || '';
+  document.getElementById('tm-pend').value = t?.planned_end || '';
+  document.getElementById('tm-status').value = t?.status || '未開始';
+  document.getElementById('tm-pct').value = t?.completion_pct ?? 0;
+  document.getElementById('tm-output').value = t?.expected_output || '';
+  document.getElementById('tm-notes').value = t?.notes || '';
+  document.getElementById('tm-delete').style.display = id ? '' : 'none';
+  openM('mtask');
+}
+
+async function saveTask(){
+  const task_name = document.getElementById('tm-name').value.trim();
+  if (!task_name) { alert('請輸入任務名稱'); return; }
+  const payload = {
+    campaign_id: detailCampaignId,
+    seq: Number(document.getElementById('tm-seq').value) || 0,
+    task_name,
+    owner: document.getElementById('tm-owner').value.trim() || null,
+    planned_start: document.getElementById('tm-pstart').value || null,
+    planned_end: document.getElementById('tm-pend').value || null,
+    status: document.getElementById('tm-status').value,
+    completion_pct: Math.max(0, Math.min(100, Number(document.getElementById('tm-pct').value) || 0)),
+    expected_output: document.getElementById('tm-output').value.trim() || null,
+    notes: document.getElementById('tm-notes').value.trim() || null
+  };
+  if (editTaskId) await PATCH(`marketing_campaign_tasks?id=eq.${editTaskId}`, payload);
+  else await POST('marketing_campaign_tasks', payload);
+  closeM('mtask');
+  await campaignDetail(detailCampaignId);
+}
+
+async function delTask(){
+  if (!editTaskId) return;
+  if (!confirm('確定刪除此任務？')) return;
+  await DEL(`marketing_campaign_tasks?id=eq.${editTaskId}`);
+  closeM('mtask');
+  await campaignDetail(detailCampaignId);
+}
+
+function openBudgetModal(id){
+  editBudgetItemId = id || null;
+  const b = id ? BUDGET_ITEMS.find(x => x.id === id) : null;
+  document.getElementById('bm-title').textContent = id ? '編輯預算項目' : '新增預算項目';
+  document.getElementById('bm-seq').value = b?.seq ?? (BUDGET_ITEMS.length ? Math.max(...BUDGET_ITEMS.map(x => x.seq || 0)) + 1 : 1);
+  document.getElementById('bm-name').value = b?.item_name || '';
+  document.getElementById('bm-nature').value = b?.budget_nature || '';
+  document.getElementById('bm-twd').value = b?.amount_twd ?? '';
+  document.getElementById('bm-rate').value = b?.exchange_rate ?? '';
+  document.getElementById('bm-rmb').value = b?.amount_rmb ?? '';
+  document.getElementById('bm-quote').value = b?.quote_status || '';
+  document.getElementById('bm-basis').value = b?.basis_note || '';
+  document.getElementById('bm-delete').style.display = id ? '' : 'none';
+  openM('mbudget');
+}
+
+async function saveBudgetItem(){
+  const item_name = document.getElementById('bm-name').value.trim();
+  if (!item_name) { alert('請輸入費用項目'); return; }
+  const payload = {
+    campaign_id: detailCampaignId,
+    seq: Number(document.getElementById('bm-seq').value) || 0,
+    item_name,
+    budget_nature: document.getElementById('bm-nature').value.trim() || null,
+    amount_twd: document.getElementById('bm-twd').value || null,
+    exchange_rate: document.getElementById('bm-rate').value || null,
+    amount_rmb: document.getElementById('bm-rmb').value || null,
+    quote_status: document.getElementById('bm-quote').value.trim() || null,
+    basis_note: document.getElementById('bm-basis').value.trim() || null
+  };
+  if (editBudgetItemId) await PATCH(`marketing_campaign_budget_items?id=eq.${editBudgetItemId}`, payload);
+  else await POST('marketing_campaign_budget_items', payload);
+  closeM('mbudget');
+  await campaignDetail(detailCampaignId);
+}
+
+async function delBudgetItem(){
+  if (!editBudgetItemId) return;
+  if (!confirm('確定刪除此預算項目？')) return;
+  await DEL(`marketing_campaign_budget_items?id=eq.${editBudgetItemId}`);
+  closeM('mbudget');
+  await campaignDetail(detailCampaignId);
 }
 
 function distinctUnits(){
@@ -267,6 +440,10 @@ function openCampaignModal(id){
   document.getElementById('cm-actual').value = c?.actual_spend ?? '';
   document.getElementById('cm-subsidy-planned').value = c?.subsidy_planned ?? '';
   document.getElementById('cm-subsidy-received').value = c?.subsidy_received ?? '';
+  document.getElementById('cm-midea-code').value = c?.midea_budget_code || '';
+  document.getElementById('cm-payment-status').value = c?.payment_status || '';
+  document.getElementById('cm-claim-status').value = c?.claim_status || '';
+  document.getElementById('cm-flight').value = c?.flight_cost ?? '';
   document.getElementById('cm-purpose').value = c?.purpose || '';
   document.getElementById('cm-status').value = c?.status || '預計規劃';
   document.getElementById('cm-owner').value = c?.owner || '';
@@ -303,6 +480,10 @@ async function saveCampaign(){
     actual_spend: document.getElementById('cm-actual').value || null,
     subsidy_planned: document.getElementById('cm-subsidy-planned').value || null,
     subsidy_received: document.getElementById('cm-subsidy-received').value || null,
+    midea_budget_code: document.getElementById('cm-midea-code').value.trim() || null,
+    payment_status: document.getElementById('cm-payment-status').value.trim() || null,
+    claim_status: document.getElementById('cm-claim-status').value.trim() || null,
+    flight_cost: document.getElementById('cm-flight').value || null,
     purpose: document.getElementById('cm-purpose').value.trim() || null,
     status: document.getElementById('cm-status').value,
     vendors: vendorRows.map(v => v.trim()).filter(Boolean),
@@ -339,8 +520,8 @@ function csvCell(v){
 }
 
 function exportCampaignsCSV(){
-  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '美的預計補助', '美的已核發補助', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
-  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.subsidy_planned, c.subsidy_received, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
+  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '美的預計補助', '美的已核發補助', '美的預算編號', '付款狀態', '請款狀態', '機票費用', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
+  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.subsidy_planned, c.subsidy_received, c.midea_budget_code, c.payment_status, c.claim_status, c.flight_cost, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
   const csv = [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

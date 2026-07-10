@@ -3,7 +3,7 @@
 純 HTML/JS + Supabase，架構參考 WOWCasa（不引入框架）。
 
 ## 功能
-- 行銷案總表（專案名稱／執行狀態／預算）＋ 點擊進入詳情頁（專案說明／專案時間／專案預算／負責人／負責單位／負責公司）＋ 時程圖
+- 行銷案總表（專案名稱／執行狀態／預算）＋ 點擊進入詳情頁（專案說明／專案時間／專案預算／補助與請款狀態／負責人／負責單位／負責公司／任務與里程碑／預算明細）＋ 時程圖
 - 總表可匯出 Excel（CSV）
 - 新聞蒐集（依關鍵字抓取 Google News RSS，經 rss2json.com 中轉，需要 API key，見下方設定）
 - 每週文案彙整：手動建立草稿，可從新聞蒐集一鍵帶入標題/連結，一鍵複製貼到 Facebook / Google Sheet
@@ -11,7 +11,7 @@
 
 ## 建置步驟
 1. 建立 Supabase project
-2. 在 SQL editor 依序執行 `schema.sql`、`schema_v2_news.sql`、`schema_v3_fields.sql`、`schema_v4_vendors.sql`
+2. 在 SQL editor 依序執行 `schema.sql`、`schema_v2_news.sql`、`schema_v3_fields.sql`、`schema_v4_vendors.sql`、`schema_v5_subsidy.sql`、`schema_v6_status.sql`、`schema_v7_case_studies.sql`、`schema_v8_tasks_budget.sql`
 3. Supabase Dashboard → Authentication 建立登入帳號（email/password）
 4. 編輯 `core/config.js`，填入 `SB`（Project URL）與 `KEY`（anon public key）
 5. 部署到 Cloudflare Pages（`/api/news` 需要 Pages Functions 才能運作，純本機開檔案 `index.html` 無法測新聞蒐集）
