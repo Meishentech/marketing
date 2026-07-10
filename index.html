@@ -368,6 +368,40 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- 風險與待決事項 modal -->
+<div class="mo" id="mrisk">
+  <div class="md">
+    <div class="mh"><div class="mt" id="rm-title">新增風險／待決事項</div><button class="mc" onclick="closeM('mrisk')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1"><label class="fl">類型</label>
+          <select id="rm-type"><option>預算</option><option>時程</option><option>廠商</option><option>原廠</option><option>素材</option><option>業務配合</option><option>補助請款</option><option>其他</option></select>
+        </div>
+        <div class="fg1"><label class="fl">影響程度</label>
+          <select id="rm-impact"><option>低</option><option>中</option><option>高</option></select>
+        </div>
+        <div class="fg1 ff"><label class="fl">事項標題 *</label><input id="rm-name" placeholder="例如 公會正式報價尚未確認"></div>
+        <div class="fg1 ff"><label class="fl">事項描述</label><textarea id="rm-desc"></textarea></div>
+        <div class="fg1"><label class="fl">負責人</label><input id="rm-owner"></div>
+        <div class="fg1"><label class="fl">到期日</label><input id="rm-due" type="date"></div>
+        <div class="fg1"><label class="fl">狀態</label>
+          <select id="rm-status"><option>待處理</option><option>處理中</option><option>已解決</option><option>暫緩</option></select>
+        </div>
+        <div class="fg1">
+          <label class="fl">Dashboard</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);padding-top:9px"><input id="rm-dashboard" type="checkbox" checked style="width:auto"> 顯示在 Dashboard</label>
+        </div>
+        <div class="fg1 ff"><label class="fl">解決說明</label><textarea id="rm-resolution"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-red" id="rm-delete" onclick="delRisk()">刪除</button>
+      <button class="btn btn-outline" onclick="closeM('mrisk')">取消</button>
+      <button class="btn btn-primary" onclick="saveRisk()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 文件附件 modal -->
 <div class="mo" id="mdoc">
   <div class="md">
