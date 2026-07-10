@@ -386,6 +386,20 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- 專案週報 modal -->
+<div class="mo" id="mweekly">
+  <div class="md">
+    <div class="mh"><div class="mt">專案週報</div><button class="mc" onclick="closeM('mweekly')">×</button></div>
+    <div class="mb">
+      <textarea id="wr-text" style="width:100%;min-height:420px;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.6;background:var(--paper);border:1.5px solid var(--line);padding:14px;resize:vertical"></textarea>
+    </div>
+    <div class="mf">
+      <button class="btn btn-outline" onclick="closeM('mweekly')">關閉</button>
+      <button class="btn btn-primary" onclick="copyWeeklyReport()">複製週報</button>
+    </div>
+  </div>
+</div>
+
 <!-- Dashboard 快速處理待決事項 modal -->
 <div class="mo" id="mquickrisk">
   <div class="md">

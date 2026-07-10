@@ -37,6 +37,7 @@ let editDocId = null;
 let editRiskId = null;
 let quickRiskId = null;
 let detailCampaignId = null;
+let detailCampaignCache = null;
 let vendorRows = [];
 let pendingCoverFile = null;
 let currentCoverPath = null;
@@ -553,6 +554,109 @@ function renderRisksBlock(risks){
     </div>`;
 }
 
+function buildWeeklyReport(c){
+  const budgetTotal = Number(c.budget) || 0;
+  const spend = Number(c.actual_spend) || 0;
+  const execRate = budgetTotal ? Math.round(spend / budgetTotal * 100) : 0;
+  const totalBudgetItems = BUDGET_ITEMS.reduce((s, b) => s + (Number(b.amount_twd) || 0), 0);
+  const doneTasks = TASKS.filter(t => t.status === '已完成').length;
+  const openTasks = TASKS.filter(t => t.status !== '已完成');
+  const overdueTasks = openTasks.filter(t => isPast(t.planned_end || t.planned_start));
+  const openRisks = RISKS.filter(r => r.status !== '已解決');
+  const highRisks = openRisks.filter(r => r.impact_level === '高');
+  const now = startOfToday();
+  const weekAgo = new Date(now.getTime() - 6 * 86400000);
+  const nextWeek = new Date(now.getTime() + 7 * 86400000);
+  const thisWeekUpdates = RISK_UPDATES
+    .filter(u => {
+      const d = dval(u.update_date);
+      return d && d >= weekAgo && d <= now;
+    })
+    .sort((a, b) => (dval(b.update_date) || 0) - (dval(a.update_date) || 0));
+  const nextFollowups = openRisks
+    .map(r => ({ r, latest: latestRiskUpdate(r.id) }))
+    .filter(x => {
+      const d = dval(x.latest?.next_followup_date) || dval(x.r.due_date);
+      return d && d <= nextWeek;
+    })
+    .sort((a, b) => (dval(a.latest?.next_followup_date || a.r.due_date) || 0) - (dval(b.latest?.next_followup_date || b.r.due_date) || 0));
+  const riskById = Object.fromEntries(RISKS.map(r => [r.id, r]));
+  const lines = [];
+  lines.push(`# ${c.name}｜專案週報`);
+  lines.push(`週報日期：${todayISO()}`);
+  lines.push('');
+  lines.push('## 1. 專案狀態');
+  lines.push(`- 執行狀態：${c.status || '-'}`);
+  lines.push(`- 負責人：${c.owner || '-'}`);
+  lines.push(`- 預計時程：${fdFull(c.planned_start)} → ${fdFull(c.planned_end)}`);
+  if (c.purpose) lines.push(`- 專案說明：${c.purpose}`);
+  lines.push('');
+  lines.push('## 2. 本週追蹤更新');
+  if (thisWeekUpdates.length) {
+    thisWeekUpdates.slice(0, 8).forEach(u => {
+      const r = riskById[u.risk_id];
+      lines.push(`- ${fdFull(u.update_date)}｜${r?.title || '待決事項'}：${u.update_note}${u.next_followup_date ? `（下次追蹤：${fdFull(u.next_followup_date)}）` : ''}`);
+    });
+  } else {
+    lines.push('- 本週尚無追蹤更新');
+  }
+  lines.push('');
+  lines.push('## 3. 未解決待決事項');
+  if (openRisks.length) {
+    openRisks.slice(0, 10).forEach(r => {
+      const latest = latestRiskUpdate(r.id);
+      lines.push(`- [${r.impact_level}/${r.status}] ${r.title}｜${r.risk_type}｜${riskFollowupLabel(r, latest)}`);
+    });
+  } else {
+    lines.push('- 目前無未解決待決事項');
+  }
+  lines.push('');
+  lines.push('## 4. 任務進度');
+  lines.push(`- 任務完成：${doneTasks}/${TASKS.length}`);
+  if (overdueTasks.length) lines.push(`- 逾期任務：${overdueTasks.length} 項`);
+  openTasks.slice(0, 8).forEach(t => lines.push(`- ${t.task_name}｜${t.status}｜${t.owner || '-'}｜${fdFull(t.planned_end || t.planned_start)}`));
+  if (!openTasks.length) lines.push('- 所有任務皆已完成或尚未建立任務');
+  lines.push('');
+  lines.push('## 5. 預算與補助');
+  lines.push(`- 專案預算：NT$ ${fmt(budgetTotal)}`);
+  lines.push(`- 實際花費：NT$ ${fmt(spend)}（${execRate}%）`);
+  if (totalBudgetItems) lines.push(`- 預算明細合計：NT$ ${fmt(totalBudgetItems)}`);
+  if (c.subsidy_planned != null || c.subsidy_received != null) lines.push(`- 美的補助：已核發 NT$ ${fmt(c.subsidy_received)} / 預計 NT$ ${fmt(c.subsidy_planned)}`);
+  if (c.claim_status || c.payment_status) lines.push(`- 請款/付款：${c.claim_status || '-'} / ${c.payment_status || '-'}`);
+  lines.push('');
+  lines.push('## 6. 下週追蹤重點');
+  if (nextFollowups.length) {
+    nextFollowups.slice(0, 8).forEach(({ r, latest }) => {
+      lines.push(`- ${fdFull(latest?.next_followup_date || r.due_date)}｜${r.title}｜${r.owner || '未指定'}`);
+    });
+  } else {
+    lines.push('- 暫無 7 天內到期追蹤項目');
+  }
+  if (highRisks.length) {
+    lines.push('');
+    lines.push('## 7. 高影響風險');
+    highRisks.slice(0, 6).forEach(r => lines.push(`- ${r.title}｜${r.status}｜${r.owner || '未指定'}`));
+  }
+  return lines.join('\n');
+}
+
+function openWeeklyReport(){
+  if (!detailCampaignCache) return;
+  document.getElementById('wr-text').value = buildWeeklyReport(detailCampaignCache);
+  openM('mweekly');
+}
+
+async function copyWeeklyReport(){
+  const text = document.getElementById('wr-text').value;
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('週報已複製');
+  } catch (e) {
+    document.getElementById('wr-text').select();
+    alert('已選取週報文字，請手動複製');
+  }
+}
+
 // ── CAMPAIGNS：詳情頁 ──
 async function campaignDetail(id){
   detailCampaignId = id;
@@ -560,6 +664,7 @@ async function campaignDetail(id){
   let c = CAMPAIGNS.find(x => x.id === id);
   if (!c) { const r = await GET(`marketing_campaigns?id=eq.${id}`); c = r?.[0]; }
   if (!c) { document.getElementById('vc').innerHTML = '<div class="empty">找不到此行銷案</div>'; return; }
+  detailCampaignCache = c;
   TASKS = await GET(`marketing_campaign_tasks?campaign_id=eq.${id}&order=seq.asc,created_at.asc`) || [];
   BUDGET_ITEMS = await GET(`marketing_campaign_budget_items?campaign_id=eq.${id}&order=seq.asc,created_at.asc`) || [];
   DOCS = await GET(`marketing_campaign_documents?campaign_id=eq.${id}&order=uploaded_at.desc`) || [];
@@ -580,7 +685,10 @@ async function campaignDetail(id){
         <div class="pt">${esc(c.name)}</div>
         <div class="ps" style="display:flex;align-items:center;gap:10px;margin-top:8px">${tag(c.status)}</div>
       </div>
-      <button class="btn btn-primary" onclick="openCampaignModal('${c.id}')">編輯</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-outline" onclick="openWeeklyReport()">產生週報</button>
+        <button class="btn btn-primary" onclick="openCampaignModal('${c.id}')">編輯</button>
+      </div>
     </div>
 
     <div class="detail-grid">
