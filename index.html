@@ -4,110 +4,212 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>美昇舒適科技 · 行銷規劃平台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#F1F5F9;--sidebar:#0F172A;--primary:#3B82F6;--green:#10B981;--amber:#F59E0B;--red:#EF4444;--text:#1E293B;--muted:#64748B;--border:#E2E8F0}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+:root{
+  --ink:#12212B;        /* 儀表金屬深藍黑 */
+  --paper:#EDF1EF;      /* 冷鋼淺灰紙 */
+  --panel:#FFFFFF;
+  --teal:#0E7C86;       /* 冷媒／進行中 */
+  --teal-deep:#0B4F55;  /* 已結案／完全冷卻 */
+  --brass:#B97A3D;      /* 黃銅／估價中 */
+  --rust:#9C3B2E;       /* 警示／刪除 */
+  --line:#D7DEDA;
+  --muted:#5C6B67;
+  --text:#12212B;
+}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:var(--paper);color:var(--text);display:flex;min-height:100vh;font-size:14px}
 button{cursor:pointer;font-family:inherit}
 input,select,textarea{font-family:inherit}
+.mono{font-family:'IBM Plex Mono',monospace}
+h1,h2,.display{font-family:'Big Shoulders Display',sans-serif;font-weight:700;letter-spacing:.01em}
 
-#login-screen{display:flex;position:fixed;inset:0;background:linear-gradient(135deg,#0F172A 0%,#1e3a5f 100%);z-index:9999;align-items:center;justify-content:center}
+/* ── Login ── */
+#login-screen{display:flex;position:fixed;inset:0;background:
+  linear-gradient(0deg, rgba(18,33,43,.94), rgba(18,33,43,.94)),
+  repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,.05) 40px),
+  repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,.05) 40px);
+  z-index:9999;align-items:center;justify-content:center}
 #login-screen.hidden{display:none!important}
-.login-box{background:#fff;border-radius:18px;padding:40px 44px;width:380px;box-shadow:0 24px 64px rgba(0,0,0,.35)}
-.login-title{font-size:22px;font-weight:800;color:#3B82F6}
-.login-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
-.login-box label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px}
-.login-box input{width:100%;padding:10px 13px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;margin-bottom:14px;outline:none}
-.login-box input:focus{border-color:var(--primary)}
-.login-btn{width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700}
-.login-btn:disabled{opacity:.6;cursor:not-allowed}
-.login-err{font-size:12px;color:var(--red);margin-top:8px;text-align:center;min-height:18px}
+.login-box{background:var(--panel);width:380px;box-shadow:0 24px 64px rgba(0,0,0,.4);border-top:4px solid var(--teal)}
+.login-inner{padding:38px 40px}
+.login-mark{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.login-ring{width:38px;height:38px;border-radius:50%;border:3px solid var(--ink);position:relative;flex-shrink:0}
+.login-ring::after{content:'';position:absolute;inset:9px;border-radius:50%;background:var(--teal)}
+.login-title{font-family:'Big Shoulders Display',sans-serif;font-size:26px;font-weight:800;line-height:1;color:var(--ink)}
+.login-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--muted);margin-top:3px;text-transform:uppercase}
+.login-box label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;margin-top:16px}
+.login-box input{width:100%;padding:10px 12px;border-radius:3px;border:1.5px solid var(--line);font-size:14px;outline:none;background:var(--paper)}
+.login-box input:focus{border-color:var(--teal)}
+.login-btn{width:100%;padding:12px;background:var(--ink);color:#fff;border:none;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:22px}
+.login-btn:hover{background:var(--teal-deep)}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-err{font-size:12px;color:var(--rust);margin-top:10px;text-align:center;min-height:16px}
 
-#sidebar{width:210px;background:var(--sidebar);color:#fff;display:none;flex-direction:column;position:fixed;height:100vh;z-index:100}
-#main{margin-left:210px;flex:1;padding:24px;min-height:100vh;display:none}
-.logo{padding:20px 18px 14px;border-bottom:1px solid #1e293b}
-.logo b{font-size:16px;font-weight:800}
-.logo small{display:block;font-size:11px;color:#64748b;margin-top:2px}
-nav{flex:1;padding:10px 0}
-.ni{display:flex;align-items:center;gap:9px;padding:9px 18px;color:#94a3b8;font-size:13px;cursor:pointer;border-left:3px solid transparent}
-.ni:hover,.ni.on{background:#1e293b;color:#fff}
-.ni.on{border-left-color:var(--primary)}
-.sfooter{padding:14px 18px;border-top:1px solid #1e293b;font-size:11px;color:#475569;display:flex;justify-content:space-between;align-items:center}
-.sfooter button{background:none;border:none;color:#94a3b8;font-size:11px}
+/* ── Shell ── */
+#sidebar{width:216px;background:var(--ink);color:#fff;display:none;flex-direction:column;position:fixed;height:100vh;z-index:100}
+#main{margin-left:216px;flex:1;padding:28px 32px;min-height:100vh;display:none}
+.logo{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px}
+.logo-ring{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.5);position:relative;flex-shrink:0}
+.logo-ring::after{content:'';position:absolute;inset:6px;border-radius:50%;background:var(--teal)}
+.logo b{font-family:'Big Shoulders Display',sans-serif;font-size:16px;font-weight:700;letter-spacing:.01em;display:block;line-height:1.15}
+.logo small{display:block;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;color:#8496a0;margin-top:2px;text-transform:uppercase}
+nav{flex:1;padding:14px 0}
+.ni{display:flex;align-items:center;gap:10px;padding:10px 20px;color:#9FB1AC;font-size:13px;cursor:pointer;border-left:3px solid transparent;font-weight:500}
+.ni::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.5;flex-shrink:0}
+.ni:hover{color:#fff}
+.ni.on{color:#fff;border-left-color:var(--teal);background:rgba(255,255,255,.04)}
+.ni.on::before{background:var(--teal);opacity:1}
+.sfooter{padding:16px 20px;border-top:1px solid rgba(255,255,255,.1);font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7C8D89;display:flex;justify-content:space-between;align-items:center}
+.sfooter button{background:none;border:none;color:#9FB1AC;font-size:11px;font-family:inherit}
+.sfooter button:hover{color:#fff}
 
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;border:none}
-.btn-primary{background:var(--primary);color:#fff}
-.btn-outline{background:#fff;color:var(--text);border:1px solid var(--border)}
-.btn-red{background:var(--red);color:#fff}
-.btn-sm{padding:4px 9px;font-size:12px}
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:3px;font-size:12.5px;font-weight:600;border:1.5px solid transparent;letter-spacing:.02em}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-primary:hover{background:var(--teal-deep)}
+.btn-outline{background:var(--panel);color:var(--text);border-color:var(--line)}
+.btn-outline:hover{border-color:var(--ink)}
+.btn-red{background:var(--panel);color:var(--rust);border-color:var(--rust)}
+.btn-red:hover{background:var(--rust);color:#fff}
+.btn-sm{padding:5px 10px;font-size:11.5px}
 
-.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap}
-.pt{font-size:21px;font-weight:700}
-.ps{font-size:12px;color:var(--muted);margin-top:2px}
-.card{background:#fff;border-radius:11px;padding:18px;border:1px solid var(--border)}
-.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
-.sc{background:#fff;border-radius:11px;padding:18px;border:1px solid var(--border)}
-.sl{font-size:12px;color:var(--muted);margin-bottom:4px}
-.sv{font-size:24px;font-weight:700}
-.ss{font-size:11px;color:var(--muted);margin-top:3px}
+/* ── Page header ── */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:14px}
+.pt{font-family:'Big Shoulders Display',sans-serif;font-size:30px;font-weight:800;line-height:1}
+.ps{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:5px;letter-spacing:.02em}
 
-.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
-.bb{background:#eff6ff;color:#3b82f6}.bg{background:#ecfdf5;color:#059669}
-.ba{background:#fffbeb;color:#d97706}.bx{background:#f1f5f9;color:#475569}
+/* ── Cards / panels ── */
+.card{background:var(--panel);padding:18px 20px;border:1px solid var(--line)}
 
-.proj-list{display:flex;flex-direction:column;gap:10px}
-.proj-card{background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden}
-.proj-top{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px;cursor:pointer;gap:12px}
-.proj-top:hover{background:#f8fafc}
-.proj-info{flex:1;min-width:0}
-.proj-name{font-size:15px;font-weight:700;margin-bottom:4px}
-.proj-meta{font-size:12px;color:var(--muted)}
-.proj-right{text-align:right;flex-shrink:0}
-.proj-amt{font-size:16px;font-weight:800;color:var(--primary);margin-bottom:4px}
+/* KPI gauge strip */
+.kpi-strip{background:var(--ink);color:#fff;padding:20px 22px;margin-bottom:16px;display:flex;gap:0;flex-wrap:wrap}
+.kpi-seg{flex:1;min-width:110px;padding:0 22px;border-left:1px solid rgba(255,255,255,.12)}
+.kpi-seg:first-child{border-left:none;padding-left:0}
+.kpi-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8496A0}
+.kpi-val{font-family:'Big Shoulders Display',sans-serif;font-size:36px;font-weight:700;line-height:1.15;margin-top:2px}
+.kpi-bar{height:4px;background:rgba(255,255,255,.12);margin-top:10px;position:relative;overflow:hidden}
+.kpi-bar i{display:block;height:100%}
 
-.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto}
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.stat-box{background:var(--panel);border:1px solid var(--line);padding:16px 20px}
+.stat-box .kpi-label{color:var(--muted)}
+.stat-box .stat-num{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;margin-top:4px;color:var(--ink)}
+.stat-box .kpi-bar{background:var(--line)}
+
+/* status thermal tag */
+.tag{display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.tag::before{content:'';width:7px;height:7px;flex-shrink:0}
+.tag-brass{color:var(--brass)}.tag-brass::before{background:var(--brass)}
+.tag-teal{color:var(--teal)}.tag-teal::before{background:var(--teal)}
+.tag-deep{color:var(--teal-deep)}.tag-deep::before{background:var(--teal-deep)}
+.tag-muted{color:var(--muted)}.tag-muted::before{background:var(--muted)}
+
+/* campaign / list rows */
+.rowlist{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line)}
+.rowcard{background:var(--panel);border-left:4px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;gap:14px}
+.rowcard:hover{background:#F5F8F6}
+.rowcard.st-brass{border-left-color:var(--brass)}
+.rowcard.st-teal{border-left-color:var(--teal)}
+.rowcard.st-deep{border-left-color:var(--teal-deep)}
+.row-info{flex:1;min-width:0}
+.row-name{font-size:14.5px;font-weight:600;margin-bottom:3px}
+.row-meta{font-size:12px;color:var(--muted)}
+.row-right{text-align:right;flex-shrink:0}
+.row-amt{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;margin-bottom:4px}
+
+/* gantt strip-chart */
+.gantt-panel{background:var(--panel);border:1px solid var(--line);padding:18px 20px;overflow-x:auto}
+.gantt-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.gantt-hd .pt2{font-family:'Big Shoulders Display',sans-serif;font-size:17px;font-weight:700}
+.gantt-legend{display:flex;gap:14px;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+.gantt-row{display:grid;grid-template-columns:170px 1fr;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--paper)}
+.gantt-name{font-size:12px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
+.gantt-name:hover{color:var(--teal)}
+.gantt-track{position:relative;height:22px;background:
+  repeating-linear-gradient(90deg, var(--line), var(--line) 1px, transparent 1px, transparent calc(100%/12));}
+.gantt-bar{position:absolute;height:100%;display:flex;align-items:center;padding:0 7px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#fff;white-space:nowrap;overflow:hidden}
+
+/* Modal */
+.mo{display:none;position:fixed;inset:0;background:rgba(18,33,43,.55);z-index:1000;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto}
 .mo.open{display:flex}
-.md{background:#fff;border-radius:14px;width:90%;max-width:620px;max-height:calc(100vh - 80px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-.mh{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff}
-.mt{font-size:16px;font-weight:700}
+.md{background:var(--panel);width:90%;max-width:620px;max-height:calc(100vh - 80px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--teal)}
+.mh{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--panel)}
+.mt{font-family:'Big Shoulders Display',sans-serif;font-size:19px;font-weight:700}
 .mc{background:none;border:none;font-size:22px;color:var(--muted);line-height:1}
+.mc:hover{color:var(--ink)}
 .mb{padding:20px 22px}
-.mf{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.mf{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
 
+/* Form */
 .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .ff{grid-column:1/-1}
 .fg1{display:flex;flex-direction:column;gap:5px}
-.fl{font-size:12px;font-weight:500}
-.fg1 input,.fg1 select,.fg1 textarea{padding:8px 11px;border-radius:7px;border:1px solid var(--border);font-size:13px}
+.fl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fg1 input,.fg1 select,.fg1 textarea{padding:8px 11px;border-radius:3px;border:1.5px solid var(--line);font-size:13px;background:var(--paper)}
+.fg1 input:focus,.fg1 select:focus,.fg1 textarea:focus{outline:none;border-color:var(--teal)}
 .fg1 textarea{resize:vertical;min-height:70px}
 
-.loading{text-align:center;padding:60px;color:var(--muted);font-size:13px}
+.loading{text-align:center;padding:60px;color:var(--muted);font-size:12px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
+.empty{text-align:center;padding:48px;color:var(--muted);font-size:13px;border:1px dashed var(--line)}
+
+/* ── Responsive ── */
+@media (max-width: 760px){
+  body{display:block}
+  #sidebar{position:static;width:100%;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:4px 0}
+  .logo{border-bottom:none;padding:10px 14px}
+  .logo small{display:none}
+  nav{display:flex;flex:1 1 auto;min-width:0;padding:0 8px 10px;overflow-x:auto}
+  .ni{border-left:none;border-bottom:3px solid transparent;padding:8px 12px;white-space:nowrap}
+  .ni.on{border-left-color:transparent;border-bottom-color:var(--teal)}
+  .sfooter{border-top:none;margin-left:auto;padding:10px 14px}
+  #main{margin-left:0;padding:18px 16px}
+  .fg{grid-template-columns:1fr}
+  .stat-row{grid-template-columns:1fr}
+  .kpi-strip{gap:14px}
+  .kpi-seg{border-left:none;padding-left:0;min-width:45%}
+  .gantt-row{grid-template-columns:110px 1fr}
+  .md{width:100%;max-width:none}
+}
 </style>
 </head>
 <body>
 
 <div id="login-screen">
   <div class="login-box">
-    <div class="login-title">美昇舒適科技</div>
-    <div class="login-sub">行銷規劃平台</div>
-    <label>帳號</label>
-    <input id="li-email" type="email" placeholder="you@example.com">
-    <label>密碼</label>
-    <input id="li-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" id="li-btn" onclick="doLogin()">登入</button>
-    <div class="login-err" id="li-err"></div>
+    <div class="login-inner">
+      <div class="login-mark">
+        <div class="login-ring"></div>
+        <div>
+          <div class="login-title">美昇舒適科技</div>
+          <div class="login-sub">Marketing Ops Console</div>
+        </div>
+      </div>
+      <label>帳號</label>
+      <input id="li-email" type="email" placeholder="you@example.com">
+      <label>密碼</label>
+      <input id="li-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" id="li-btn" onclick="doLogin()">登入</button>
+      <div class="login-err" id="li-err"></div>
+    </div>
   </div>
 </div>
 
 <div id="sidebar">
-  <div class="logo"><b>美昇舒適科技</b><small>行銷規劃平台</small></div>
+  <div class="logo">
+    <div class="logo-ring"></div>
+    <div><b>美昇舒適科技</b><small>Marketing Ops</small></div>
+  </div>
   <nav>
-    <div class="ni" data-view="dashboard" onclick="nav('dashboard')">📊 總覽</div>
-    <div class="ni" data-view="campaigns" onclick="nav('campaigns')">📋 行銷案管理</div>
-    <div class="ni" data-view="news" onclick="nav('news')">🔍 新聞蒐集</div>
-    <div class="ni" data-view="drafts" onclick="nav('drafts')">📝 每週文案彙整</div>
+    <div class="ni" data-view="dashboard" onclick="nav('dashboard')">總覽</div>
+    <div class="ni" data-view="campaigns" onclick="nav('campaigns')">行銷案管理</div>
+    <div class="ni" data-view="news" onclick="nav('news')">新聞蒐集</div>
+    <div class="ni" data-view="drafts" onclick="nav('drafts')">每週文案彙整</div>
   </nav>
-  <div class="sfooter"><span id="sb-user"></span><button onclick="doLogout()">登出</button></div>
+  <div class="sfooter"><span id="sb-user" class="mono"></span><button onclick="doLogout()">登出</button></div>
 </div>
 
 <div id="main"><div id="vc"></div></div>
