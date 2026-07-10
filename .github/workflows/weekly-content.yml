@@ -1,0 +1,21 @@
+name: Weekly content draft generation
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # 每週一 08:00 台北時間（UTC+8）
+  workflow_dispatch: {}
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/generate-weekly-content.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RSS2JSON_API_KEY: ${{ secrets.RSS2JSON_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
