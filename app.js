@@ -201,6 +201,9 @@ async function campaignDetail(id){
         <div class="stat-num">NT$ ${fmt(c.budget)}</div>
         <div class="muted-text" style="margin-top:6px">實際花費 NT$ ${fmt(c.actual_spend)}（${execRate}%）</div>
         <div class="kpi-bar" style="background:var(--line)"><i style="width:${Math.min(100, execRate)}%;background:var(--teal)"></i></div>
+        ${(c.subsidy_planned != null || c.subsidy_received != null) ? `
+          <div class="muted-text" style="margin-top:10px">美的預計補助 NT$ ${fmt(c.subsidy_planned)}</div>
+          <div class="muted-text" style="margin-top:2px">美的已核發補助 NT$ ${fmt(c.subsidy_received)}</div>` : ''}
       </div>
 
       <div class="card detail-block">
@@ -251,6 +254,8 @@ function openCampaignModal(id){
   document.getElementById('cm-name').value = c?.name || '';
   document.getElementById('cm-budget').value = c?.budget ?? '';
   document.getElementById('cm-actual').value = c?.actual_spend ?? '';
+  document.getElementById('cm-subsidy-planned').value = c?.subsidy_planned ?? '';
+  document.getElementById('cm-subsidy-received').value = c?.subsidy_received ?? '';
   document.getElementById('cm-purpose').value = c?.purpose || '';
   document.getElementById('cm-status').value = c?.status || '估價';
   document.getElementById('cm-owner').value = c?.owner || '';
@@ -285,6 +290,8 @@ async function saveCampaign(){
     name,
     budget: document.getElementById('cm-budget').value || null,
     actual_spend: document.getElementById('cm-actual').value || null,
+    subsidy_planned: document.getElementById('cm-subsidy-planned').value || null,
+    subsidy_received: document.getElementById('cm-subsidy-received').value || null,
     purpose: document.getElementById('cm-purpose').value.trim() || null,
     status: document.getElementById('cm-status').value,
     vendors: vendorRows.map(v => v.trim()).filter(Boolean),
@@ -321,8 +328,8 @@ function csvCell(v){
 }
 
 function exportCampaignsCSV(){
-  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
-  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
+  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '美的預計補助', '美的已核發補助', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
+  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.subsidy_planned, c.subsidy_received, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
   const csv = [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
