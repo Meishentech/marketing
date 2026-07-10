@@ -109,6 +109,18 @@ nav{flex:1;padding:14px 0}
 .tag-deep{color:var(--teal-deep)}.tag-deep::before{background:var(--teal-deep)}
 .tag-muted{color:var(--muted)}.tag-muted::before{background:var(--muted)}
 
+/* 成功案例 grid */
+.case-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.case-card{background:var(--panel);border:1px solid var(--line);cursor:pointer;overflow:hidden}
+.case-card:hover{border-color:var(--teal)}
+.case-cover{width:100%;aspect-ratio:16/10;background:var(--paper);object-fit:cover;display:block}
+.case-cover-ph{width:100%;aspect-ratio:16/10;background:var(--paper);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
+.case-body{padding:14px 16px}
+.case-name{font-size:16px;font-weight:600;margin-bottom:4px}
+.case-meta{font-size:13px;color:var(--muted)}
+.case-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.case-tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:2px 8px;background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+
 /* campaign / list rows (dashboard「最近更新」用) */
 .rowlist{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line)}
 .rowcard{background:var(--panel);border-left:4px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:16px 18px;cursor:pointer;gap:14px}
@@ -231,6 +243,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="ni" data-view="campaigns" onclick="nav('campaigns')">行銷案管理</div>
     <div class="ni" data-view="news" onclick="nav('news')">新聞蒐集</div>
     <div class="ni" data-view="drafts" onclick="nav('drafts')">每週文案彙整</div>
+    <div class="ni" data-view="cases" onclick="nav('cases')">成功案例</div>
   </nav>
   <div class="sfooter"><span id="sb-user" class="mono"></span><button onclick="doLogout()">登出</button></div>
 </div>
@@ -300,6 +313,34 @@ tbody tr:last-child td{border-bottom:none}
       <button class="btn btn-red" id="dm-delete" onclick="delDraft()">刪除</button>
       <button class="btn btn-outline" onclick="closeM('mdraft')">取消</button>
       <button class="btn btn-primary" onclick="saveDraft()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 成功案例 modal -->
+<div class="mo" id="mcase">
+  <div class="md">
+    <div class="mh"><div class="mt" id="cs-title-label">新增案例</div><button class="mc" onclick="closeM('mcase')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1 ff"><label class="fl">案例標題 *</label><input id="cs-title"></div>
+        <div class="fg1"><label class="fl">案場／專案名稱</label><input id="cs-project"></div>
+        <div class="fg1"><label class="fl">使用產品型號</label><input id="cs-model" placeholder="例如 MagBoost 磁懸浮變頻離心式冰水機"></div>
+        <div class="fg1 ff"><label class="fl">案例摘要（翻譯後內容）</label><textarea id="cs-summary" style="min-height:100px"></textarea></div>
+        <div class="fg1 ff"><label class="fl">成效數字</label><input id="cs-metrics" placeholder="例如 年省228萬度電、COP提升至6.4+"></div>
+        <div class="fg1 ff"><label class="fl">標籤（逗號分隔）</label><input id="cs-tags" placeholder="例如 工業製程,節能,磁懸浮"></div>
+        <div class="fg1 ff"><label class="fl">Canva 設計連結</label><input id="cs-canva" placeholder="https://www.canva.com/design/..."></div>
+        <div class="fg1 ff">
+          <label class="fl">封面照片</label>
+          <div id="cs-cover-preview" style="margin-bottom:8px"></div>
+          <input id="cs-cover-file" type="file" accept="image/*" onchange="onCoverFilePick(this)">
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-red" id="cs-delete" onclick="delCaseStudy()">刪除</button>
+      <button class="btn btn-outline" onclick="closeM('mcase')">取消</button>
+      <button class="btn btn-primary" onclick="saveCaseStudy()">儲存</button>
     </div>
   </div>
 </div>

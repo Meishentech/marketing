@@ -20,12 +20,16 @@ function sortByStatus(list){
 let CAMPAIGNS = [];
 let DRAFTS = [];
 let KEYWORDS = [];
+let CASES = [];
 let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
 let editDraftId = null;
+let editCaseId = null;
 let detailCampaignId = null;
 let vendorRows = [];
+let pendingCoverFile = null;
+let currentCoverPath = null;
 
 // ── NAV ──
 async function nav(view){
@@ -35,6 +39,7 @@ async function nav(view){
   else if (view === 'campaigns') await renderCampaignsPage();
   else if (view === 'drafts') await renderDraftsPage();
   else if (view === 'news') await renderNewsPage();
+  else if (view === 'cases') await renderCasesPage();
 }
 
 function tag(status){
@@ -515,6 +520,104 @@ async function fetchNewsFor(id, keyword){
 async function createDraftFromNews(title, link){
   CAMPAIGNS = await GET('marketing_campaigns?order=name.asc') || [];
   openDraftModal(null, { title, source_note: link });
+}
+
+// ── 成功案例 ──
+async function renderCasesPage(){
+  document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
+  CASES = await GET('marketing_case_studies?order=created_at.desc') || [];
+
+  const cardsHtml = await Promise.all(CASES.map(async c => {
+    const coverUrl = c.cover_image_path ? await getSignedUrl('case-study-photos', c.cover_image_path) : '';
+    const tagsHtml = (c.tags || []).map(t => `<span class="case-tag">${esc(t)}</span>`).join('');
+    return `
+    <div class="case-card" onclick="openCaseModal('${c.id}')">
+      ${coverUrl ? `<img class="case-cover" src="${coverUrl}" loading="lazy">` : '<div class="case-cover-ph">尚無封面照片</div>'}
+      <div class="case-body">
+        <div class="case-name">${esc(c.title)}</div>
+        <div class="case-meta">${esc(c.project_name || '')}${c.product_model ? ' · ' + esc(c.product_model) : ''}</div>
+        ${c.metrics ? `<div class="case-meta" style="margin-top:4px;color:var(--teal)">${esc(c.metrics)}</div>` : ''}
+        <div class="case-tags">${tagsHtml}</div>
+      </div>
+    </div>`;
+  }));
+
+  document.getElementById('vc').innerHTML = `
+    <div class="ph">
+      <div><div class="pt">成功案例</div><div class="ps">共 ${CASES.length} 筆，原廠案例翻譯整理後存放於此</div></div>
+      <button class="btn btn-primary" onclick="openCaseModal()">＋ 新增案例</button>
+    </div>
+    <div class="case-grid">${cardsHtml.join('') || ''}</div>
+    ${CASES.length ? '' : '<div class="empty">尚無案例，點擊右上角新增</div>'}`;
+}
+
+async function openCaseModal(id){
+  editCaseId = id || null;
+  const c = id ? CASES.find(x => x.id === id) : null;
+  document.getElementById('cs-title-label').textContent = id ? '編輯案例' : '新增案例';
+  document.getElementById('cs-title').value = c?.title || '';
+  document.getElementById('cs-project').value = c?.project_name || '';
+  document.getElementById('cs-model').value = c?.product_model || '';
+  document.getElementById('cs-summary').value = c?.summary || '';
+  document.getElementById('cs-metrics').value = c?.metrics || '';
+  document.getElementById('cs-tags').value = (c?.tags || []).join(',');
+  document.getElementById('cs-canva').value = c?.canva_design_url || '';
+  document.getElementById('cs-cover-file').value = '';
+  pendingCoverFile = null;
+  currentCoverPath = c?.cover_image_path || null;
+
+  const preview = document.getElementById('cs-cover-preview');
+  if (currentCoverPath) {
+    const url = await getSignedUrl('case-study-photos', currentCoverPath);
+    preview.innerHTML = url ? `<img src="${url}" style="max-width:200px;display:block">` : '';
+  } else {
+    preview.innerHTML = '';
+  }
+
+  document.getElementById('cs-delete').style.display = id ? '' : 'none';
+  openM('mcase');
+}
+
+function onCoverFilePick(input){
+  pendingCoverFile = input.files[0] || null;
+  const preview = document.getElementById('cs-cover-preview');
+  if (pendingCoverFile) preview.innerHTML = `<span class="muted-text">待上傳：${esc(pendingCoverFile.name)}</span>`;
+}
+
+async function saveCaseStudy(){
+  const title = document.getElementById('cs-title').value.trim();
+  if (!title) { alert('請輸入案例標題'); return; }
+
+  let coverPath = currentCoverPath;
+  if (pendingCoverFile) {
+    try { coverPath = await uploadStorageFile('case-study-photos', pendingCoverFile); }
+    catch (e) { alert('封面照片上傳失敗：' + e.message); return; }
+  }
+
+  const payload = {
+    title,
+    project_name: document.getElementById('cs-project').value.trim() || null,
+    product_model: document.getElementById('cs-model').value.trim() || null,
+    summary: document.getElementById('cs-summary').value.trim() || null,
+    metrics: document.getElementById('cs-metrics').value.trim() || null,
+    tags: document.getElementById('cs-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+    canva_design_url: document.getElementById('cs-canva').value.trim() || null,
+    cover_image_path: coverPath,
+    updated_at: new Date().toISOString()
+  };
+  if (editCaseId) await PATCH(`marketing_case_studies?id=eq.${editCaseId}`, payload);
+  else await POST('marketing_case_studies', payload);
+  closeM('mcase');
+  await renderCasesPage();
+}
+
+async function delCaseStudy(){
+  if (!editCaseId) return;
+  if (!confirm('確定刪除此案例？')) return;
+  if (currentCoverPath) await deleteStorageFile('case-study-photos', currentCoverPath);
+  await DEL(`marketing_case_studies?id=eq.${editCaseId}`);
+  closeM('mcase');
+  await renderCasesPage();
 }
 
 // ── MODAL ──
