@@ -9,10 +9,7 @@ export async function onRequestGet(context) {
   const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
   const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
   const res = await fetch(proxyUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  if (!res.ok) {
-    const body = (await res.text()).slice(0, 300);
-    return json({ error: `rss2json fetch failed: ${res.status}`, debug: body }, 502);
-  }
+  if (!res.ok) return json({ error: `rss2json fetch failed: ${res.status}` }, 502);
   const data = await res.json();
   if (data.status !== 'ok') return json({ error: data.message || 'rss2json 回傳失敗' }, 502);
 
