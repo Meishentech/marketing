@@ -496,7 +496,7 @@ function renderRisksBlock(risks){
     </tr>`).join('');
   return `
     <div class="tw">
-      <table>
+      <table class="risk-table">
         <thead><tr><th>類型</th><th>事項</th><th>影響</th><th>狀態</th><th>負責人</th><th>到期日</th><th>追蹤</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
