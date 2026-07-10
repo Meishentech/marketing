@@ -13,10 +13,7 @@ export async function onRequestGet(context) {
       'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8'
     }
   });
-  if (!res.ok) {
-    const body = (await res.text()).slice(0, 500);
-    return json({ error: `rss fetch failed: ${res.status}`, debug_body: body, debug_headers: Object.fromEntries(res.headers) }, 502);
-  }
+  if (!res.ok) return json({ error: `rss fetch failed: ${res.status}` }, 502);
   const xml = await res.text();
 
   const items = [];
