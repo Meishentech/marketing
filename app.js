@@ -51,17 +51,129 @@ function tag(status){
   return `<span class="tag tag-${cls}">${esc(status)}</span>`;
 }
 
+function dval(s){
+  return s ? new Date(`${s}T00:00:00`) : null;
+}
+
+function daysUntil(s){
+  const d = dval(s);
+  if (!d) return null;
+  const today = dval(todayISO());
+  return Math.ceil((d - today) / 86400000);
+}
+
+function inNextDays(s, days = 30){
+  const n = daysUntil(s);
+  return n != null && n >= 0 && n <= days;
+}
+
+function isPast(s){
+  const n = daysUntil(s);
+  return n != null && n < 0;
+}
+
+function campaignWindow(c){
+  const start = c.actual_start || c.planned_start;
+  const end = c.actual_end || c.planned_end || start;
+  return { start, end };
+}
+
+function campaignCategory(c){
+  const text = `${c.name || ''} ${c.purpose || ''} ${c.notes || ''}`;
+  if (/展|展會|空調展/.test(text)) return '展會';
+  if (/商周|商業週刊|遠見|媒體|廣編|B2B/.test(text)) return '媒體曝光';
+  if (/公會|講座|技師/.test(text)) return '公會活動';
+  if (/訪廠|重慶/.test(text)) return '訪廠／差旅';
+  if (/餐會|感恩|客戶/.test(text)) return '客戶關係';
+  if (/官網|網站|數位/.test(text)) return '官網／數位';
+  if (/Logo|CI|DM|名片|設計|印製|期刊/.test(text)) return '素材製作';
+  return '其他';
+}
+
+function riskReasons(c, tasks = [], budgetItems = []){
+  const reasons = [];
+  const spend = Number(c.actual_spend) || 0;
+  const budget = Number(c.budget) || 0;
+  const { end } = campaignWindow(c);
+  const openTasks = tasks.filter(t => t.campaign_id === c.id && t.status !== '已完成');
+  const overdueTasks = openTasks.filter(t => isPast(t.planned_end || t.planned_start));
+  const pendingTasks = openTasks.filter(t => t.status === '待確認');
+  const pendingQuotes = budgetItems.filter(b => b.campaign_id === c.id && /待|估算/.test(`${b.quote_status || ''}${b.budget_nature || ''}`));
+
+  if (budget && spend > budget) reasons.push(`預算超支 NT$ ${fmt(spend - budget)}`);
+  if (overdueTasks.length) reasons.push(`${overdueTasks.length} 項任務逾期`);
+  if (pendingTasks.length) reasons.push(`${pendingTasks.length} 項任務待確認`);
+  if (pendingQuotes.length) reasons.push(`${pendingQuotes.length} 項預算仍待報價/核定`);
+  if (end && isPast(end) && c.status !== '結案') reasons.push('專案時程已過但尚未結案');
+  if (c.status === '補助申請' || /待|未/.test(`${c.claim_status || ''}${c.payment_status || ''}`)) reasons.push('補助或請款需追蹤');
+  if (!c.owner && c.status !== '結案') reasons.push('尚未指定負責人');
+  return reasons;
+}
+
+function decisionReasons(c, tasks = [], budgetItems = []){
+  const reasons = [];
+  const { start } = campaignWindow(c);
+  const pendingQuotes = budgetItems.filter(b => b.campaign_id === c.id && /待報價|待核定|待拆價|估算/.test(`${b.quote_status || ''}${b.budget_nature || ''}`));
+  const pendingTasks = tasks.filter(t => t.campaign_id === c.id && t.status === '待確認');
+
+  if (c.status === '估價中') reasons.push('預算/報價待核定');
+  if (pendingQuotes.length) reasons.push(`${pendingQuotes.length} 項費用待核定`);
+  if (pendingTasks.length) reasons.push(`${pendingTasks.length} 項任務待確認`);
+  if (start && inNextDays(start, 30) && c.status === '預計規劃') reasons.push('30 天內啟動，需確認是否執行');
+  if (c.status === '補助申請' || /待|未/.test(`${c.claim_status || ''}`)) reasons.push('補助請款需決策/追蹤');
+  return reasons;
+}
+
 // ── DASHBOARD ──
 async function renderDashboard(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
   CAMPAIGNS = await GET('marketing_campaigns?order=created_at.desc') || [];
+  const dashboardTasks = await GET('marketing_campaign_tasks?select=id,campaign_id,task_name,planned_start,planned_end,status,completion_pct&order=planned_end.asc') || [];
+  const dashboardBudgetItems = await GET('marketing_campaign_budget_items?select=id,campaign_id,item_name,budget_nature,amount_twd,quote_status&order=seq.asc') || [];
   const total = CAMPAIGNS.length;
   const statusCounts = STATUS_ORDER.map(s => ({ status: s, count: CAMPAIGNS.filter(c => c.status === s).length }));
   const totalBudget = CAMPAIGNS.reduce((s, c) => s + (Number(c.budget) || 0), 0);
   const totalSpend = CAMPAIGNS.reduce((s, c) => s + (Number(c.actual_spend) || 0), 0);
+  const remainingBudget = Math.max(0, totalBudget - totalSpend);
+  const subsidyPlanned = CAMPAIGNS.reduce((s, c) => s + (Number(c.subsidy_planned) || 0), 0);
+  const subsidyReceived = CAMPAIGNS.reduce((s, c) => s + (Number(c.subsidy_received) || 0), 0);
+  const subsidyRate = subsidyPlanned ? Math.round(subsidyReceived / subsidyPlanned * 100) : 0;
   const execRate = totalBudget ? Math.round(totalSpend / totalBudget * 100) : 0;
 
-  const recent = CAMPAIGNS.slice(0, 5).map(c => `
+  const campaignById = Object.fromEntries(CAMPAIGNS.map(c => [c.id, c]));
+  const upcomingCampaigns = CAMPAIGNS
+    .map(c => ({ c, ...campaignWindow(c) }))
+    .filter(x => inNextDays(x.start, 30) || inNextDays(x.end, 30))
+    .sort((a, b) => (dval(a.start || a.end) || 0) - (dval(b.start || b.end) || 0))
+    .slice(0, 6);
+  const upcomingTasks = dashboardTasks
+    .filter(t => t.status !== '已完成' && (inNextDays(t.planned_end, 30) || inNextDays(t.planned_start, 30)))
+    .slice(0, 6);
+  const decisions = CAMPAIGNS
+    .map(c => ({ c, reasons: decisionReasons(c, dashboardTasks, dashboardBudgetItems) }))
+    .filter(x => x.reasons.length)
+    .slice(0, 6);
+  const risks = CAMPAIGNS
+    .map(c => ({ c, reasons: riskReasons(c, dashboardTasks, dashboardBudgetItems) }))
+    .filter(x => x.reasons.length)
+    .sort((a, b) => b.reasons.length - a.reasons.length)
+    .slice(0, 6);
+  const focusProjects = [...CAMPAIGNS]
+    .filter(c => c.status !== '結案')
+    .sort((a, b) => {
+      const ar = riskReasons(a, dashboardTasks, dashboardBudgetItems).length;
+      const br = riskReasons(b, dashboardTasks, dashboardBudgetItems).length;
+      if (br !== ar) return br - ar;
+      return (Number(b.budget) || 0) - (Number(a.budget) || 0);
+    })
+    .slice(0, 5);
+  const categories = Object.entries(CAMPAIGNS.reduce((acc, c) => {
+    const k = campaignCategory(c);
+    acc[k] = (acc[k] || 0) + (Number(c.budget) || 0);
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 7);
+
+  const focusRows = focusProjects.map(c => `
     <div class="rowcard st-${STATUS_CLASS[c.status] || ''}" onclick="campaignDetail('${c.id}')">
       <div class="row-info"><div class="row-name">${esc(c.name)}</div></div>
       <div class="row-right">
@@ -69,26 +181,81 @@ async function renderDashboard(){
         ${tag(c.status)}
       </div>
     </div>`).join('') || '<div class="empty">尚無行銷案</div>';
+  const upcomingRows = [
+    ...upcomingCampaigns.map(({ c, start, end }) => `
+      <div class="dash-item" onclick="campaignDetail('${c.id}')">
+        <div><div class="dash-item-title">${esc(c.name)}</div><div class="dash-item-sub mono">${fdFull(start)}${end && end !== start ? ' → ' + fdFull(end) : ''}</div></div>
+        ${tag(c.status)}
+      </div>`),
+    ...upcomingTasks.map(t => {
+      const c = campaignById[t.campaign_id];
+      return `<div class="dash-item" onclick="campaignDetail('${t.campaign_id}')">
+        <div><div class="dash-item-title">${esc(t.task_name)}</div><div class="dash-item-sub">${esc(c?.name || '')} · <span class="mono">${fdFull(t.planned_end || t.planned_start)}</span></div></div>
+        ${taskStatusTag(t.status)}
+      </div>`;
+    })
+  ].slice(0, 8).join('') || '<div class="empty">未來 30 天沒有已排定的重點活動或任務</div>';
+  const decisionRows = decisions.map(({ c, reasons }) => `
+    <div class="dash-alert" onclick="campaignDetail('${c.id}')">
+      <div><div class="dash-item-title">${esc(c.name)}</div><div class="dash-item-sub">${esc(reasons.join('、'))}</div></div>
+      ${tag(c.status)}
+    </div>`).join('') || '<div class="empty">目前沒有明確待決策項目</div>';
+  const riskRows = risks.map(({ c, reasons }) => `
+    <div class="dash-alert risk" onclick="campaignDetail('${c.id}')">
+      <div><div class="dash-item-title">${esc(c.name)}</div><div class="dash-item-sub">${esc(reasons.join('、'))}</div></div>
+      <span class="mono dash-risk-count">${reasons.length}</span>
+    </div>`).join('') || '<div class="empty">目前沒有高風險專案</div>';
+  const categoryRows = categories.map(([name, amount]) => {
+    const pct = totalBudget ? Math.round(amount / totalBudget * 100) : 0;
+    return `<div class="dash-mix-row">
+      <div class="dash-mix-label">${esc(name)}<span class="mono">NT$ ${fmt(amount)}</span></div>
+      <div class="kpi-bar"><i style="width:${pct}%;background:var(--teal)"></i></div>
+    </div>`;
+  }).join('') || '<div class="empty">尚無預算分類資料</div>';
 
   document.getElementById('vc').innerHTML = `
-    <div class="ph"><div><div class="pt">總覽</div><div class="ps">${new Date().getFullYear()} 年度行銷規劃</div></div>
+    <div class="ph"><div><div class="pt">經營總覽</div><div class="ps">${new Date().getFullYear()} 年度行銷投資、風險與近期活動</div></div>
       <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button></div>
     <div class="kpi-strip">
       <div class="kpi-seg"><div class="kpi-label">全部行銷案</div><div class="kpi-val mono">${total}</div></div>
       ${statusCounts.map(({ status, count }) => `
         <div class="kpi-seg"><div class="kpi-label">${esc(status)}</div><div class="kpi-val mono" style="color:${STATUS_HEX[status]}">${count}</div></div>`).join('')}
     </div>
-    <div class="stat-row">
+    <div class="dash-kpi-grid">
       <div class="stat-box"><div class="kpi-label">年度總預算</div><div class="stat-num">NT$ ${fmt(totalBudget)}</div></div>
       <div class="stat-box">
         <div class="kpi-label">預算執行率</div>
         <div class="stat-num">${execRate}<span style="font-size:16px">%</span> <span style="font-size:13px;color:var(--muted);font-family:'IBM Plex Sans';font-weight:500">NT$ ${fmt(totalSpend)} 已花費</span></div>
         <div class="kpi-bar"><i style="width:${Math.min(100, execRate)}%;background:var(--teal)"></i></div>
       </div>
+      <div class="stat-box"><div class="kpi-label">剩餘可用預算</div><div class="stat-num">NT$ ${fmt(remainingBudget)}</div></div>
+      <div class="stat-box">
+        <div class="kpi-label">美的補助核發率</div>
+        <div class="stat-num">${subsidyRate}<span style="font-size:16px">%</span> <span style="font-size:13px;color:var(--muted);font-family:'IBM Plex Sans';font-weight:500">NT$ ${fmt(subsidyReceived)} / ${fmt(subsidyPlanned)}</span></div>
+        <div class="kpi-bar"><i style="width:${Math.min(100, subsidyRate)}%;background:var(--steel)"></i></div>
+      </div>
     </div>
-    <div>
-      <div class="kpi-label" style="margin-bottom:8px">最近更新行銷案</div>
-      <div class="rowlist">${recent}</div>
+    <div class="dash-grid">
+      <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="kpi-label">未來 30 天</div><div class="dash-panel-title">重點活動與任務</div></div></div>
+        <div class="dash-list">${upcomingRows}</div>
+      </div>
+      <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="kpi-label">總經理視角</div><div class="dash-panel-title">待決策事項</div></div></div>
+        <div class="dash-list">${decisionRows}</div>
+      </div>
+      <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="kpi-label">管理風險</div><div class="dash-panel-title">高風險專案</div></div></div>
+        <div class="dash-list">${riskRows}</div>
+      </div>
+      <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="kpi-label">資源配置</div><div class="dash-panel-title">預算分類</div></div></div>
+        <div class="dash-mix">${categoryRows}</div>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="kpi-label" style="margin-bottom:8px">重點專案 Top 5</div>
+      <div class="rowlist">${focusRows}</div>
     </div>`;
 }
 

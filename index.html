@@ -99,6 +99,24 @@ nav{flex:1;padding:14px 0}
 .stat-box .stat-num{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;margin-top:5px;color:var(--ink)}
 .stat-box .kpi-bar{background:var(--line)}
 
+.dash-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.dash-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+.dash-panel{padding:16px 18px}
+.dash-panel-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.dash-panel-title{font-size:18px;font-weight:700;margin-top:3px}
+.dash-list{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line)}
+.dash-item,.dash-alert{background:var(--panel);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 13px;cursor:pointer}
+.dash-item:hover,.dash-alert:hover{background:#F5F8F6}
+.dash-alert{border-left:4px solid var(--brass)}
+.dash-alert.risk{border-left-color:var(--rust)}
+.dash-item-title{font-size:15px;font-weight:600;line-height:1.35}
+.dash-item-sub{font-size:13px;color:var(--muted);line-height:1.45;margin-top:3px}
+.dash-risk-count{background:var(--rust);color:#fff;min-width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.dash-mix{display:flex;flex-direction:column;gap:12px}
+.dash-mix-row .kpi-bar{background:var(--line);margin-top:6px}
+.dash-mix-label{display:flex;justify-content:space-between;gap:12px;font-size:14px;font-weight:600}
+.dash-mix-label span{color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap}
+
 /* status thermal tag */
 .tag{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
 .tag::before{content:'';width:8px;height:8px;flex-shrink:0}
@@ -201,6 +219,8 @@ tbody tr:last-child td{border-bottom:none}
   #main{margin-left:0;padding:18px 16px}
   .fg{grid-template-columns:1fr}
   .stat-row{grid-template-columns:1fr}
+  .dash-kpi-grid{grid-template-columns:1fr}
+  .dash-grid{grid-template-columns:1fr}
   .detail-grid{grid-template-columns:1fr}
   .kpi-strip{gap:14px}
   .kpi-seg{border-left:none;padding-left:0;min-width:45%}
