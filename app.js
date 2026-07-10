@@ -755,16 +755,8 @@ async function saveRiskUpdate(){
   if (!editRiskId) return;
   const note = document.getElementById('rm-update-note').value.trim();
   if (!note) { alert('請輸入更新內容'); return; }
-  const payload = {
-    risk_id: editRiskId,
-    update_note: note,
-    updated_by: document.getElementById('rm-update-by').value.trim() || null,
-    update_date: document.getElementById('rm-update-date').value || todayISO(),
-    next_followup_date: document.getElementById('rm-next-date').value || null,
-    is_important: document.getElementById('rm-update-important').checked
-  };
   try {
-    await POST('marketing_campaign_risk_updates', payload);
+    await createRiskUpdate(editRiskId);
     await PATCH(`marketing_campaign_risks?id=eq.${editRiskId}`, { updated_at: new Date().toISOString() });
   } catch (e) {
     alert('追蹤紀錄資料表尚未啟用，請先在 Supabase SQL Editor 執行 schema_v11_risk_updates.sql。');
@@ -781,9 +773,23 @@ async function saveRiskUpdate(){
   openRiskModal(editRiskId);
 }
 
+async function createRiskUpdate(riskId){
+  const note = document.getElementById('rm-update-note').value.trim();
+  if (!note) return null;
+  return POST('marketing_campaign_risk_updates', {
+    risk_id: riskId,
+    update_note: note,
+    updated_by: document.getElementById('rm-update-by').value.trim() || null,
+    update_date: document.getElementById('rm-update-date').value || todayISO(),
+    next_followup_date: document.getElementById('rm-next-date').value || null,
+    is_important: document.getElementById('rm-update-important').checked
+  });
+}
+
 async function saveRisk(){
   const title = document.getElementById('rm-name').value.trim();
   if (!title) { alert('請輸入事項標題'); return; }
+  const pendingUpdateNote = editRiskId ? document.getElementById('rm-update-note')?.value.trim() : '';
   const payload = {
     campaign_id: detailCampaignId,
     risk_type: document.getElementById('rm-type').value,
@@ -800,8 +806,9 @@ async function saveRisk(){
   try {
     if (editRiskId) await PATCH(`marketing_campaign_risks?id=eq.${editRiskId}`, payload);
     else await POST('marketing_campaign_risks', payload);
+    if (editRiskId && pendingUpdateNote) await createRiskUpdate(editRiskId);
   } catch (e) {
-    alert('風險與待決事項資料表尚未啟用，請先在 Supabase SQL Editor 執行 schema_v10_risks.sql。');
+    alert('資料儲存失敗，請確認 schema_v10_risks.sql 與 schema_v11_risk_updates.sql 已在 Supabase SQL Editor 執行。');
     return;
   }
   closeM('mrisk');
