@@ -386,6 +386,33 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- Dashboard 快速處理待決事項 modal -->
+<div class="mo" id="mquickrisk">
+  <div class="md">
+    <div class="mh"><div><div class="mt" id="qr-title">快速處理</div><div class="muted-text" id="qr-context" style="margin-top:4px"></div></div><button class="mc" onclick="closeM('mquickrisk')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1 ff"><label class="fl">本次更新</label><textarea id="qr-note" placeholder="例如 已聯絡廠商，預計明天下午回覆"></textarea></div>
+        <div class="fg1"><label class="fl">更新人</label><input id="qr-by"></div>
+        <div class="fg1"><label class="fl">更新日期</label><input id="qr-date" type="date"></div>
+        <div class="fg1"><label class="fl">下次追蹤日</label><input id="qr-next" type="date"></div>
+        <div class="fg1"><label class="fl">狀態</label>
+          <select id="qr-status"><option>待處理</option><option>處理中</option><option>已解決</option><option>暫緩</option></select>
+        </div>
+        <div class="fg1">
+          <label class="fl">標記</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);padding-top:9px"><input id="qr-important" type="checkbox" style="width:auto"> 重要更新</label>
+        </div>
+        <div class="fg1 ff"><label class="fl">結案說明</label><textarea id="qr-resolution" placeholder="狀態改為已解決時必填"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-outline" onclick="closeM('mquickrisk')">取消</button>
+      <button class="btn btn-primary" onclick="saveQuickRisk()">儲存並更新 Dashboard</button>
+    </div>
+  </div>
+</div>
+
 <!-- 風險與待決事項 modal -->
 <div class="mo" id="mrisk">
   <div class="md">

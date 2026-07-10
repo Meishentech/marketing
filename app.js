@@ -35,6 +35,7 @@ let editTaskId = null;
 let editBudgetItemId = null;
 let editDocId = null;
 let editRiskId = null;
+let quickRiskId = null;
 let detailCampaignId = null;
 let vendorRows = [];
 let pendingCoverFile = null;
@@ -202,6 +203,8 @@ async function renderDashboard(){
   const dashboardBudgetItems = await GET('marketing_campaign_budget_items?select=id,campaign_id,item_name,budget_nature,amount_twd,quote_status&order=seq.asc') || [];
   const dashboardRisks = await safeGET('marketing_campaign_risks?select=id,campaign_id,risk_type,title,description,impact_level,owner,due_date,status,show_on_dashboard,resolution_note&order=due_date.asc,created_at.desc');
   const dashboardRiskUpdates = await safeGET('marketing_campaign_risk_updates?select=id,risk_id,update_note,updated_by,update_date,next_followup_date,is_important,created_at&order=update_date.desc,created_at.desc');
+  RISKS = dashboardRisks;
+  RISK_UPDATES = dashboardRiskUpdates;
   const total = CAMPAIGNS.length;
   const statusCounts = STATUS_ORDER.map(s => ({ status: s, count: CAMPAIGNS.filter(c => c.status === s).length }));
   const totalBudget = CAMPAIGNS.reduce((s, c) => s + (Number(c.budget) || 0), 0);
@@ -309,7 +312,10 @@ async function renderDashboard(){
         <div class="dash-item-sub">${esc(c.name)} · ${esc(r.risk_type)} · ${esc(r.owner || '未指定')}</div>
         ${latest?.update_note ? `<div class="dash-item-sub">${esc(latest.update_note).slice(0, 56)}${latest.update_note.length > 56 ? '…' : ''}</div>` : ''}
       </div>
-      <div class="follow-badge">${esc(meta.label)}</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <div class="follow-badge">${esc(meta.label)}</div>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openQuickRiskModal('${r.id}')">處理</button>
+      </div>
     </div>`).join('') || '<div class="empty">目前沒有需追蹤的待決事項</div>';
   const categoryRows = categories.map(([name, amount]) => {
     const pct = totalBudget ? Math.round(amount / totalBudget * 100) : 0;
@@ -814,6 +820,56 @@ async function saveRiskUpdate(){
   renderRiskUpdates(editRiskId);
   await campaignDetail(detailCampaignId);
   openRiskModal(editRiskId);
+}
+
+function openQuickRiskModal(id){
+  quickRiskId = id;
+  const r = RISKS.find(x => x.id === id);
+  if (!r) return;
+  const c = CAMPAIGNS.find(x => x.id === r.campaign_id);
+  const latest = latestRiskUpdate(id);
+  document.getElementById('qr-title').textContent = r.title || '快速處理';
+  document.getElementById('qr-context').textContent = `${c?.name || ''} · ${r.risk_type} · ${riskFollowupLabel(r, latest)}`;
+  document.getElementById('qr-note').value = '';
+  document.getElementById('qr-by').value = r.owner || '';
+  document.getElementById('qr-date').value = todayISO();
+  document.getElementById('qr-next').value = latest?.next_followup_date || '';
+  document.getElementById('qr-status').value = r.status || '處理中';
+  document.getElementById('qr-resolution').value = r.resolution_note || '';
+  document.getElementById('qr-important').checked = false;
+  openM('mquickrisk');
+}
+
+async function saveQuickRisk(){
+  if (!quickRiskId) return;
+  const note = document.getElementById('qr-note').value.trim();
+  const status = document.getElementById('qr-status').value;
+  const resolution = document.getElementById('qr-resolution').value.trim();
+  if (!note && status !== '已解決') { alert('請輸入本次更新內容'); return; }
+  if (status === '已解決' && !resolution) { alert('請輸入結案說明'); return; }
+  const riskPayload = {
+    status,
+    resolution_note: resolution || null,
+    updated_at: new Date().toISOString()
+  };
+  const updatePayload = note ? {
+    risk_id: quickRiskId,
+    update_note: note,
+    updated_by: document.getElementById('qr-by').value.trim() || null,
+    update_date: document.getElementById('qr-date').value || todayISO(),
+    next_followup_date: document.getElementById('qr-next').value || null,
+    is_important: document.getElementById('qr-important').checked
+  } : null;
+  try {
+    if (updatePayload) await POST('marketing_campaign_risk_updates', updatePayload);
+    await PATCH(`marketing_campaign_risks?id=eq.${quickRiskId}`, riskPayload);
+  } catch (e) {
+    alert('快速處理儲存失敗，請確認追蹤紀錄資料表已啟用。');
+    return;
+  }
+  closeM('mquickrisk');
+  quickRiskId = null;
+  await renderDashboard();
 }
 
 async function createRiskUpdate(riskId){
