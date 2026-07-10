@@ -181,6 +181,19 @@ function riskNeedsUpdate(risk, latest){
   return !!last && (startOfToday() - last) > 7 * 24 * 60 * 60 * 1000;
 }
 
+function riskFollowupMeta(risk, latest){
+  if (risk.status === '已解決') return { key: 'done', label: '已解決', priority: 99 };
+  const today = startOfToday();
+  const next = dval(latest?.next_followup_date);
+  const last = dval(latest?.update_date);
+  if (next && next < today) return { key: 'overdue', label: `逾期 ${fdFull(latest.next_followup_date)}`, priority: 1 };
+  if (next && next.getTime() === today.getTime()) return { key: 'today', label: '今天追蹤', priority: 2 };
+  if (next && next <= new Date(today.getTime() + 7 * 86400000)) return { key: 'week', label: `7天內 ${fdFull(latest.next_followup_date)}`, priority: 4 };
+  if (!latest) return { key: 'no-update', label: '尚無更新', priority: 3 };
+  if (last && (today - last) > 7 * 86400000) return { key: 'stale', label: `久未更新 ${fdFull(latest.update_date)}`, priority: 3 };
+  return { key: 'current', label: `最近更新 ${fdFull(latest.update_date)}`, priority: 8 };
+}
+
 // ── DASHBOARD ──
 async function renderDashboard(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
@@ -225,6 +238,18 @@ async function renderDashboard(){
       const stale = x => riskNeedsUpdate(x.r, x.latest) ? 1 : 0;
       return stale(b) - stale(a) || score(b) - score(a) || (dval(a.r.due_date) || 0) - (dval(b.r.due_date) || 0);
     });
+  const followupItems = formalRiskRows
+    .map(x => ({ ...x, meta: riskFollowupMeta(x.r, x.latest) }))
+    .filter(x => x.meta.key !== 'done')
+    .sort((a, b) => {
+      const impact = x => ({ '高': 3, '中': 2, '低': 1 }[x.r.impact_level] || 0);
+      const nextA = dval(a.latest?.next_followup_date) || dval(a.r.due_date) || new Date(8640000000000000);
+      const nextB = dval(b.latest?.next_followup_date) || dval(b.r.due_date) || new Date(8640000000000000);
+      return a.meta.priority - b.meta.priority || nextA - nextB || impact(b) - impact(a);
+    });
+  const todayFollowups = followupItems.filter(x => x.meta.key === 'today').length;
+  const overdueFollowups = followupItems.filter(x => ['overdue', 'no-update', 'stale'].includes(x.meta.key)).length;
+  const highOpenRisks = followupItems.filter(x => x.r.impact_level === '高').length;
   const risks = formalRiskRows.length ? formalRiskRows.slice(0, 6) : CAMPAIGNS
     .map(c => ({ c, reasons: riskReasons(c, dashboardTasks, dashboardBudgetItems) }))
     .filter(x => x.reasons.length)
@@ -277,6 +302,15 @@ async function renderDashboard(){
       <div><div class="dash-item-title">${esc(r?.title || c.name)}</div><div class="dash-item-sub">${esc(r ? `${c.name} · ${r.risk_type} · ${riskFollowupLabel(r, latest)}` : reasons.join('、'))}</div></div>
       ${r ? riskImpactTag(r.impact_level) : `<span class="mono dash-risk-count">${reasons.length}</span>`}
     </div>`).join('') || '<div class="empty">目前沒有高風險專案</div>';
+  const followupRows = followupItems.slice(0, 8).map(({ c, r, latest, meta }) => `
+    <div class="follow-row ${meta.key}" onclick="campaignDetail('${c.id}')">
+      <div>
+        <div class="dash-item-title">${esc(r.title)}</div>
+        <div class="dash-item-sub">${esc(c.name)} · ${esc(r.risk_type)} · ${esc(r.owner || '未指定')}</div>
+        ${latest?.update_note ? `<div class="dash-item-sub">${esc(latest.update_note).slice(0, 56)}${latest.update_note.length > 56 ? '…' : ''}</div>` : ''}
+      </div>
+      <div class="follow-badge">${esc(meta.label)}</div>
+    </div>`).join('') || '<div class="empty">目前沒有需追蹤的待決事項</div>';
   const categoryRows = categories.map(([name, amount]) => {
     const pct = totalBudget ? Math.round(amount / totalBudget * 100) : 0;
     return `<div class="dash-mix-row">
@@ -306,6 +340,15 @@ async function renderDashboard(){
         <div class="stat-num">${subsidyRate}<span style="font-size:16px">%</span> <span style="font-size:13px;color:var(--muted);font-family:'IBM Plex Sans';font-weight:500">NT$ ${fmt(subsidyReceived)} / ${fmt(subsidyPlanned)}</span></div>
         <div class="kpi-bar"><i style="width:${Math.min(100, subsidyRate)}%;background:var(--steel)"></i></div>
       </div>
+    </div>
+    <div class="card dash-panel" style="margin-bottom:16px">
+      <div class="dash-panel-head"><div><div class="kpi-label">追蹤節奏</div><div class="dash-panel-title">今日待辦與逾期追蹤</div></div></div>
+      <div class="follow-grid">
+        <div class="follow-stat"><div class="num mono">${todayFollowups}</div><div class="label">今日需追蹤</div></div>
+        <div class="follow-stat"><div class="num mono">${overdueFollowups}</div><div class="label">逾期／尚無更新</div></div>
+        <div class="follow-stat"><div class="num mono">${highOpenRisks}</div><div class="label">高影響未解決</div></div>
+      </div>
+      <div class="follow-list">${followupRows}</div>
     </div>
     <div class="dash-grid">
       <div class="card dash-panel">
