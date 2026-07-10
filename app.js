@@ -2,6 +2,7 @@
 const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => n == null || n === '' ? '-' : Number(n).toLocaleString('zh-TW');
 const fd  = s => s ? s.slice(5).replace('-', '/') : '';
+const fdFull = s => s ? s.replace(/-/g, '/') : '未填';
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 // 狀態沿用冷媒循環的溫度隱喻：估價＝尚未啟動（黃銅），進行中＝正在冷卻（冷媒藍綠），結案＝完全冷卻（深藍綠）
@@ -15,6 +16,7 @@ let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
 let editDraftId = null;
+let detailCampaignId = null;
 
 // ── NAV ──
 async function nav(view){
@@ -44,12 +46,12 @@ async function renderDashboard(){
   const execRate = totalBudget ? Math.round(totalSpend / totalBudget * 100) : 0;
 
   const recent = CAMPAIGNS.slice(0, 5).map(c => `
-    <div class="rowcard st-${STATUS_CLASS[c.status] || ''}" onclick="openCampaignModal('${c.id}')">
-      <div class="row-info">
-        <div class="row-name">${esc(c.name)}</div>
-        <div class="row-meta">${esc(c.partner || '')}${c.vendor ? ' · 委外：' + esc(c.vendor) : ''}</div>
+    <div class="rowcard st-${STATUS_CLASS[c.status] || ''}" onclick="campaignDetail('${c.id}')">
+      <div class="row-info"><div class="row-name">${esc(c.name)}</div></div>
+      <div class="row-right">
+        <div class="row-amt">NT$ ${fmt(c.budget)}</div>
+        ${tag(c.status)}
       </div>
-      <div class="row-right">${tag(c.status)}</div>
     </div>`).join('') || '<div class="empty">尚無行銷案</div>';
 
   document.getElementById('vc').innerHTML = `
@@ -65,7 +67,7 @@ async function renderDashboard(){
       <div class="stat-box"><div class="kpi-label">年度總預算</div><div class="stat-num">NT$ ${fmt(totalBudget)}</div></div>
       <div class="stat-box">
         <div class="kpi-label">預算執行率</div>
-        <div class="stat-num">${execRate}<span style="font-size:14px">%</span> <span style="font-size:12px;color:var(--muted);font-family:'IBM Plex Sans'">NT$ ${fmt(totalSpend)} 已花費</span></div>
+        <div class="stat-num">${execRate}<span style="font-size:16px">%</span> <span style="font-size:13px;color:var(--muted);font-family:'IBM Plex Sans';font-weight:500">NT$ ${fmt(totalSpend)} 已花費</span></div>
         <div class="kpi-bar"><i style="width:${Math.min(100, execRate)}%;background:var(--teal)"></i></div>
       </div>
     </div>
@@ -75,7 +77,7 @@ async function renderDashboard(){
     </div>`;
 }
 
-// ── CAMPAIGNS ──
+// ── CAMPAIGNS：總表 ──
 async function renderCampaignsPage(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
   CAMPAIGNS = await GET('marketing_campaigns?order=created_at.desc') || [];
@@ -86,26 +88,28 @@ async function renderCampaignsPage(){
 function _renderCampaignsBody(){
   const isGantt = _campaignView === 'gantt';
   const rows = CAMPAIGNS.map(c => `
-    <div class="rowcard st-${STATUS_CLASS[c.status] || ''}" onclick="openCampaignModal('${c.id}')">
-      <div class="row-info">
-        <div class="row-name">${esc(c.name)}</div>
-        <div class="row-meta">${esc(c.partner || '未填配合單位')}${c.vendor ? ' · 委外：' + esc(c.vendor) : ''}${c.purpose ? ' · ' + esc(c.purpose) : ''}</div>
-      </div>
-      <div class="row-right">
-        <div class="row-amt">NT$ ${fmt(c.budget)}</div>
-        ${tag(c.status)}
-      </div>
-    </div>`).join('');
+    <tr onclick="campaignDetail('${c.id}')">
+      <td class="tb-name">${esc(c.name)}</td>
+      <td>${tag(c.status)}</td>
+      <td class="mono tb-amt">NT$ ${fmt(c.budget)}</td>
+    </tr>`).join('');
 
   document.getElementById('vc').innerHTML = `
     <div class="ph">
       <div><div class="pt">行銷案管理</div><div class="ps">共 ${CAMPAIGNS.length} 筆</div></div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="exportCampaignsCSV()">匯出 Excel</button>
         <button class="btn btn-outline btn-sm" id="btn-gantt-toggle" onclick="toggleCampaignGantt()" style="${isGantt ? 'background:var(--ink);color:#fff;border-color:var(--ink)' : ''}">時程圖</button>
         <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>
       </div>
     </div>
-    <div id="campaign-list" style="${isGantt ? 'display:none' : ''}" class="rowlist">${rows || '<div class="empty">尚無行銷案</div>'}</div>
+    <div id="campaign-list" style="${isGantt ? 'display:none' : ''}" class="tw">
+      <table>
+        <thead><tr><th>專案名稱</th><th>執行狀態</th><th>預算</th></tr></thead>
+        <tbody>${rows || ''}</tbody>
+      </table>
+      ${rows ? '' : '<div class="empty">尚無行銷案</div>'}
+    </div>
     <div id="campaign-gantt" style="${isGantt ? '' : 'display:none'}"></div>`;
   if (isGantt) renderCampaignGantt();
 }
@@ -137,13 +141,13 @@ function renderCampaignGantt(){
     const left = pct(s); const w = Math.max(1, pct(e) - left);
     const color = STATUS_HEX[c.status] || '#5C6B67';
     return `<div class="gantt-row">
-      <div class="gantt-name" onclick="openCampaignModal('${c.id}')" title="${esc(c.name)}">${esc(c.name)}</div>
+      <div class="gantt-name" onclick="campaignDetail('${c.id}')" title="${esc(c.name)}">${esc(c.name)}</div>
       <div class="gantt-track">
         <div class="gantt-bar mono" style="left:${left}%;width:${w}%;background:${color}">${fd(s)}${e !== s ? ` – ${fd(e)}` : ''}</div>
       </div></div>`;
   }).join('');
-  const headerCols = months.map((m, i) => { const next = months[i + 1]; const w = next ? next.left - m.left : 100 - m.left; return `<div style="position:absolute;left:${m.left}%;width:${w}%;font-size:10px;color:var(--muted);overflow:hidden;white-space:nowrap" class="mono">${m.label}</div>`; }).join('');
-  const legend = Object.entries(STATUS_HEX).map(([s, c]) => `<span style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-block;width:8px;height:8px;background:${c}"></span>${s}</span>`).join('');
+  const headerCols = months.map((m, i) => { const next = months[i + 1]; const w = next ? next.left - m.left : 100 - m.left; return `<div style="position:absolute;left:${m.left}%;width:${w}%;font-size:11px;color:var(--muted);overflow:hidden;white-space:nowrap" class="mono">${m.label}</div>`; }).join('');
+  const legend = Object.entries(STATUS_HEX).map(([s, c]) => `<span style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-block;width:9px;height:9px;background:${c}"></span>${s}</span>`).join('');
   gantt.innerHTML = `
     <div class="gantt-panel">
       <div class="gantt-hd">
@@ -153,6 +157,82 @@ function renderCampaignGantt(){
       <div style="display:grid;grid-template-columns:170px 1fr;gap:10px;margin-bottom:6px"><div></div><div style="position:relative;height:16px">${headerCols}</div></div>
       ${rows}
     </div>`;
+}
+
+// ── CAMPAIGNS：詳情頁 ──
+async function campaignDetail(id){
+  detailCampaignId = id;
+  document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
+  let c = CAMPAIGNS.find(x => x.id === id);
+  if (!c) { const r = await GET(`marketing_campaigns?id=eq.${id}`); c = r?.[0]; }
+  if (!c) { document.getElementById('vc').innerHTML = '<div class="empty">找不到此行銷案</div>'; return; }
+
+  const execRate = c.budget ? Math.round((Number(c.actual_spend) || 0) / c.budget * 100) : 0;
+  const hasTime = c.planned_start || c.planned_end || c.actual_start || c.actual_end;
+
+  document.getElementById('vc').innerHTML = `
+    <div class="ph">
+      <div>
+        <button class="btn btn-outline btn-sm" onclick="nav('campaigns')" style="margin-bottom:12px">← 返回總表</button>
+        <div class="pt">${esc(c.name)}</div>
+        <div class="ps" style="display:flex;align-items:center;gap:10px;margin-top:8px">${tag(c.status)}</div>
+      </div>
+      <button class="btn btn-primary" onclick="openCampaignModal('${c.id}')">編輯</button>
+    </div>
+
+    <div class="detail-grid">
+      <div class="card detail-block ff">
+        <div class="kpi-label">專案說明</div>
+        <div class="detail-text">${c.purpose ? esc(c.purpose) : '<span class="muted-text">尚未填寫</span>'}</div>
+      </div>
+
+      <div class="card detail-block">
+        <div class="kpi-label">專案時間</div>
+        ${hasTime ? `
+          <div class="detail-timeline">
+            <div><span class="mono">${fdFull(c.planned_start)}</span> → <span class="mono">${fdFull(c.planned_end)}</span><div class="muted-text" style="margin-top:2px">預計</div></div>
+            <div><span class="mono">${fdFull(c.actual_start)}</span> → <span class="mono">${fdFull(c.actual_end)}</span><div class="muted-text" style="margin-top:2px">實際</div></div>
+          </div>` : '<div class="muted-text">尚未填寫</div>'}
+      </div>
+
+      <div class="card detail-block">
+        <div class="kpi-label">專案預算</div>
+        <div class="stat-num">NT$ ${fmt(c.budget)}</div>
+        <div class="muted-text" style="margin-top:6px">實際花費 NT$ ${fmt(c.actual_spend)}（${execRate}%）</div>
+        <div class="kpi-bar" style="background:var(--line)"><i style="width:${Math.min(100, execRate)}%;background:var(--teal)"></i></div>
+      </div>
+
+      <div class="card detail-block">
+        <div class="kpi-label">負責人</div>
+        <div class="detail-text">${c.owner ? esc(c.owner) : '<span class="muted-text">尚未填寫</span>'}</div>
+      </div>
+
+      <div class="card detail-block">
+        <div class="kpi-label">負責單位</div>
+        <div class="detail-text">${c.owner_unit ? esc(c.owner_unit) : '<span class="muted-text">尚未填寫</span>'}</div>
+      </div>
+
+      <div class="card detail-block ff">
+        <div class="kpi-label">合作資訊</div>
+        <div class="detail-timeline">
+          <div>${c.partner ? esc(c.partner) : '<span class="muted-text">無</span>'}<div class="muted-text" style="margin-top:2px">配合單位</div></div>
+          <div>${c.vendor ? esc(c.vendor) : '<span class="muted-text">無</span>'}<div class="muted-text" style="margin-top:2px">委託第三方</div></div>
+        </div>
+      </div>
+
+      ${c.notes ? `<div class="card detail-block ff"><div class="kpi-label">備註</div><div class="detail-text">${esc(c.notes)}</div></div>` : ''}
+    </div>`;
+}
+
+function distinctUnits(){
+  return [...new Set(CAMPAIGNS.map(c => c.owner_unit).filter(Boolean))].sort();
+}
+
+function onUnitSelectChange(){
+  const sel = document.getElementById('cm-unit');
+  const wrap = document.getElementById('cm-unit-new-wrap');
+  if (sel.value === '__new__') { wrap.style.display = ''; document.getElementById('cm-unit-new').focus(); }
+  else { wrap.style.display = 'none'; }
 }
 
 function openCampaignModal(id){
@@ -166,11 +246,23 @@ function openCampaignModal(id){
   document.getElementById('cm-purpose').value = c?.purpose || '';
   document.getElementById('cm-status').value = c?.status || '估價';
   document.getElementById('cm-vendor').value = c?.vendor || '';
+  document.getElementById('cm-owner').value = c?.owner || '';
   document.getElementById('cm-pstart').value = c?.planned_start || '';
   document.getElementById('cm-pend').value = c?.planned_end || '';
   document.getElementById('cm-astart').value = c?.actual_start || '';
   document.getElementById('cm-aend').value = c?.actual_end || '';
   document.getElementById('cm-notes').value = c?.notes || '';
+
+  const unitSel = document.getElementById('cm-unit');
+  unitSel.innerHTML = '<option value="">（未指定）</option>' +
+    distinctUnits().map(u => `<option value="${esc(u)}" ${c?.owner_unit === u ? 'selected' : ''}>${esc(u)}</option>`).join('') +
+    '<option value="__new__">＋ 新增單位…</option>';
+  document.getElementById('cm-unit-new').value = '';
+  document.getElementById('cm-unit-new-wrap').style.display = 'none';
+  if (c?.owner_unit && !distinctUnits().includes(c.owner_unit)) {
+    unitSel.innerHTML += `<option value="${esc(c.owner_unit)}" selected>${esc(c.owner_unit)}</option>`;
+  }
+
   document.getElementById('cm-delete').style.display = id ? '' : 'none';
   openM('mcampaign');
 }
@@ -178,6 +270,8 @@ function openCampaignModal(id){
 async function saveCampaign(){
   const name = document.getElementById('cm-name').value.trim();
   if (!name) { alert('請輸入專案名稱'); return; }
+  const unitSel = document.getElementById('cm-unit').value;
+  const ownerUnit = unitSel === '__new__' ? document.getElementById('cm-unit-new').value.trim() : unitSel;
   const payload = {
     name,
     budget: document.getElementById('cm-budget').value || null,
@@ -186,6 +280,8 @@ async function saveCampaign(){
     purpose: document.getElementById('cm-purpose').value.trim() || null,
     status: document.getElementById('cm-status').value,
     vendor: document.getElementById('cm-vendor').value.trim() || null,
+    owner: document.getElementById('cm-owner').value.trim() || null,
+    owner_unit: ownerUnit || null,
     planned_start: document.getElementById('cm-pstart').value || null,
     planned_end: document.getElementById('cm-pend').value || null,
     actual_start: document.getElementById('cm-astart').value || null,
@@ -193,10 +289,14 @@ async function saveCampaign(){
     notes: document.getElementById('cm-notes').value.trim() || null,
     updated_at: new Date().toISOString()
   };
+  let savedId = editCampaignId;
   if (editCampaignId) await PATCH(`marketing_campaigns?id=eq.${editCampaignId}`, payload);
-  else await POST('marketing_campaigns', payload);
+  else { const r = await POST('marketing_campaigns', payload); savedId = r?.[0]?.id; }
   closeM('mcampaign');
-  await renderCampaignsPage();
+  CAMPAIGNS = await GET('marketing_campaigns?order=created_at.desc') || [];
+  if (savedId && detailCampaignId === savedId) await campaignDetail(savedId);
+  else if (_view === 'campaigns') _renderCampaignsBody();
+  else await nav(_view);
 }
 
 async function delCampaign(){
@@ -205,6 +305,23 @@ async function delCampaign(){
   await DEL(`marketing_campaigns?id=eq.${editCampaignId}`);
   closeM('mcampaign');
   await renderCampaignsPage();
+}
+
+function csvCell(v){
+  const s = (v ?? '').toString();
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function exportCampaignsCSV(){
+  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '負責人', '負責單位', '配合單位', '委託第三方', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
+  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.owner, c.owner_unit, c.partner, c.vendor, c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
+  const csv = [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `行銷案清單_${todayISO()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── 每週文案彙整 ──
@@ -227,19 +344,19 @@ async function renderDraftsPage(){
   const body = weeks.map(w => `
     <div class="card" style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
-        <div class="mono" style="font-size:13px;font-weight:600">${fd(w)} 那一週</div>
+        <div class="mono" style="font-size:15px;font-weight:600">${fd(w)} 那一週</div>
         <button class="btn btn-outline btn-sm" onclick="copyWeek('${w}')">複製整週文案</button>
       </div>
       ${groups[w].map(d => `
-        <div style="padding:10px 0;border-bottom:1px solid var(--paper)">
-          <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
-            <div style="flex:1">
-              <div style="font-weight:600;font-size:13px">${esc(d.title || '（未命名文案）')}</div>
-              <div style="font-size:12px;color:var(--muted);white-space:pre-wrap;margin-top:4px">${esc(d.content).slice(0, 160)}${d.content.length > 160 ? '…' : ''}</div>
+        <div style="padding:12px 0;border-bottom:1px solid var(--paper)">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:start;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div style="font-weight:600;font-size:16px">${esc(d.title || '（未命名文案）')}</div>
+              <div style="font-size:14px;color:var(--muted);white-space:pre-wrap;margin-top:5px">${esc(d.content).slice(0, 160)}${d.content.length > 160 ? '…' : ''}</div>
             </div>
             <div style="text-align:right;flex-shrink:0">
               <span class="tag tag-${DRAFT_TAG_CLASS[d.status] || 'muted'}">${esc(d.status)}</span>
-              <div style="margin-top:6px;display:flex;gap:4px">
+              <div style="margin-top:8px;display:flex;gap:6px">
                 <button class="btn btn-outline btn-sm" onclick="openDraftModal('${d.id}')">編輯</button>
                 <button class="btn btn-outline btn-sm" onclick="copyDraft('${d.id}')">複製</button>
               </div>
@@ -317,22 +434,22 @@ async function renderNewsPage(){
   KEYWORDS = await GET('marketing_news_keywords?order=created_at.asc') || [];
   const groups = KEYWORDS.map(k => `
     <div class="card" style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
-        <div style="font-weight:600;font-size:14px">${esc(k.keyword)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:8px">
+        <div style="font-weight:600;font-size:16px">${esc(k.keyword)}</div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-outline btn-sm" onclick="fetchNewsFor('${k.id}','${esc(k.keyword)}')">重新抓取</button>
           <button class="btn btn-red btn-sm" onclick="delKeyword('${k.id}')">刪除關鍵字</button>
         </div>
       </div>
-      <div id="news-${k.id}" class="mono" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">尚未抓取，點擊「重新抓取」</div>
+      <div id="news-${k.id}" class="mono" style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">尚未抓取，點擊「重新抓取」</div>
     </div>`).join('');
 
   document.getElementById('vc').innerHTML = `
     <div class="ph">
       <div><div class="pt">新聞蒐集</div><div class="ps">依關鍵字抓取 Google 新聞，供撰寫行銷文案參考</div></div>
     </div>
-    <div class="card" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
-      <input id="nk-input" placeholder="新增關鍵字" style="flex:1;padding:8px 11px;border-radius:3px;border:1.5px solid var(--line);font-size:13px">
+    <div class="card" style="margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="nk-input" placeholder="新增關鍵字" style="flex:1;min-width:160px;padding:10px 12px;border-radius:3px;border:1.5px solid var(--line);font-size:15px">
       <button class="btn btn-primary btn-sm" onclick="addKeyword()">＋ 新增</button>
     </div>
     ${groups || '<div class="empty">尚無關鍵字，請先新增</div>'}`;
@@ -362,10 +479,10 @@ async function fetchNewsFor(id, keyword){
     if (!res.ok || data.error) throw new Error(data.error || '抓取失敗');
     if (!data.items?.length) { box.innerHTML = '沒有找到相關新聞'; return; }
     box.innerHTML = data.items.map(it => `
-      <div style="padding:9px 0;border-bottom:1px solid var(--paper);display:flex;justify-content:space-between;gap:10px;align-items:start">
-        <div style="flex:1;min-width:0">
-          <a href="${esc(it.link)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;color:var(--text);font-family:'IBM Plex Sans'">${esc(it.title)}</a>
-          <div class="mono" style="font-size:10.5px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.03em">${esc(it.source)}${it.pubDate ? ' · ' + esc(it.pubDate) : ''}</div>
+      <div style="padding:10px 0;border-bottom:1px solid var(--paper);display:flex;justify-content:space-between;gap:10px;align-items:start;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <a href="${esc(it.link)}" target="_blank" rel="noopener" style="font-size:15px;font-weight:600;color:var(--text);font-family:'IBM Plex Sans'">${esc(it.title)}</a>
+          <div class="mono" style="font-size:11.5px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.03em">${esc(it.source)}${it.pubDate ? ' · ' + esc(it.pubDate) : ''}</div>
         </div>
         <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick='createDraftFromNews(${JSON.stringify(it.title)}, ${JSON.stringify(it.link)})'>＋ 建立文案草稿</button>
       </div>`).join('');
