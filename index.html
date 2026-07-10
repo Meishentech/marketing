@@ -16,6 +16,8 @@
   --teal:#0E7C86;       /* 冷媒／進行中 */
   --teal-deep:#0B4F55;  /* 已結案／完全冷卻 */
   --brass:#B97A3D;      /* 黃銅／估價中 */
+  --slate:#7C8B94;      /* 石灰／預計規劃 */
+  --steel:#5B7FA6;      /* 鋼藍／補助申請 */
   --rust:#9C3B2E;       /* 警示／刪除 */
   --line:#D7DEDA;
   --muted:#5C6B67;
@@ -100,8 +102,10 @@ nav{flex:1;padding:14px 0}
 /* status thermal tag */
 .tag{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
 .tag::before{content:'';width:8px;height:8px;flex-shrink:0}
+.tag-plan{color:var(--slate)}.tag-plan::before{background:var(--slate)}
 .tag-brass{color:var(--brass)}.tag-brass::before{background:var(--brass)}
 .tag-teal{color:var(--teal)}.tag-teal::before{background:var(--teal)}
+.tag-grant{color:var(--steel)}.tag-grant::before{background:var(--steel)}
 .tag-deep{color:var(--teal-deep)}.tag-deep::before{background:var(--teal-deep)}
 .tag-muted{color:var(--muted)}.tag-muted::before{background:var(--muted)}
 
@@ -109,8 +113,10 @@ nav{flex:1;padding:14px 0}
 .rowlist{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line)}
 .rowcard{background:var(--panel);border-left:4px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:16px 18px;cursor:pointer;gap:14px}
 .rowcard:hover{background:#F5F8F6}
+.rowcard.st-plan{border-left-color:var(--slate)}
 .rowcard.st-brass{border-left-color:var(--brass)}
 .rowcard.st-teal{border-left-color:var(--teal)}
+.rowcard.st-grant{border-left-color:var(--steel)}
 .rowcard.st-deep{border-left-color:var(--teal-deep)}
 .row-info{flex:1;min-width:0}
 .row-name{font-size:16px;font-weight:600}
@@ -240,7 +246,7 @@ tbody tr:last-child td{border-bottom:none}
         <div class="fg1 ff"><label class="fl">專案名稱 *</label><input id="cm-name"></div>
         <div class="fg1 ff"><label class="fl">專案說明</label><textarea id="cm-purpose"></textarea></div>
         <div class="fg1"><label class="fl">進度</label>
-          <select id="cm-status"><option>估價</option><option>進行中</option><option>結案</option></select>
+          <select id="cm-status"><option>預計規劃</option><option>估價中</option><option>進行中</option><option>補助申請</option><option>結案</option></select>
         </div>
         <div class="fg1"></div>
         <div class="fg1"><label class="fl">專案總預算</label><input id="cm-budget" type="number"></div>

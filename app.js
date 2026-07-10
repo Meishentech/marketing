@@ -5,9 +5,17 @@ const fd  = s => s ? s.slice(5).replace('-', '/') : '';
 const fdFull = s => s ? s.replace(/-/g, '/') : '未填';
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-// 狀態沿用冷媒循環的溫度隱喻：估價＝尚未啟動（黃銅），進行中＝正在冷卻（冷媒藍綠），結案＝完全冷卻（深藍綠）
-const STATUS_HEX   = { '估價': '#B97A3D', '進行中': '#0E7C86', '結案': '#0B4F55' };
-const STATUS_CLASS = { '估價': 'brass',   '進行中': 'teal',    '結案': 'deep' };
+// 狀態沿用冷媒循環的溫度隱喻：預計規劃＝尚未升溫（灰），估價中＝尚未啟動（黃銅），進行中＝正在冷卻（冷媒藍綠），補助申請＝行政作業（鋼藍），結案＝完全冷卻（深藍綠）
+const STATUS_ORDER = ['預計規劃', '估價中', '進行中', '補助申請', '結案'];
+const STATUS_HEX   = { '預計規劃': '#7C8B94', '估價中': '#B97A3D', '進行中': '#0E7C86', '補助申請': '#5B7FA6', '結案': '#0B4F55' };
+const STATUS_CLASS = { '預計規劃': 'plan',    '估價中': 'brass',   '進行中': 'teal',    '補助申請': 'grant',   '結案': 'deep' };
+
+function sortByStatus(list){
+  return [...list].sort((a, b) => {
+    const d = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+    return d !== 0 ? d : new Date(b.created_at) - new Date(a.created_at);
+  });
+}
 
 let CAMPAIGNS = [];
 let DRAFTS = [];
@@ -39,9 +47,7 @@ async function renderDashboard(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
   CAMPAIGNS = await GET('marketing_campaigns?order=created_at.desc') || [];
   const total = CAMPAIGNS.length;
-  const inProgress = CAMPAIGNS.filter(c => c.status === '進行中').length;
-  const quoting = CAMPAIGNS.filter(c => c.status === '估價').length;
-  const closed = CAMPAIGNS.filter(c => c.status === '結案').length;
+  const statusCounts = STATUS_ORDER.map(s => ({ status: s, count: CAMPAIGNS.filter(c => c.status === s).length }));
   const totalBudget = CAMPAIGNS.reduce((s, c) => s + (Number(c.budget) || 0), 0);
   const totalSpend = CAMPAIGNS.reduce((s, c) => s + (Number(c.actual_spend) || 0), 0);
   const execRate = totalBudget ? Math.round(totalSpend / totalBudget * 100) : 0;
@@ -60,9 +66,8 @@ async function renderDashboard(){
       <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button></div>
     <div class="kpi-strip">
       <div class="kpi-seg"><div class="kpi-label">全部行銷案</div><div class="kpi-val mono">${total}</div></div>
-      <div class="kpi-seg"><div class="kpi-label">估價中</div><div class="kpi-val mono" style="color:${STATUS_HEX['估價']}">${quoting}</div></div>
-      <div class="kpi-seg"><div class="kpi-label">進行中</div><div class="kpi-val mono" style="color:${STATUS_HEX['進行中']}">${inProgress}</div></div>
-      <div class="kpi-seg"><div class="kpi-label">已結案</div><div class="kpi-val mono" style="color:${STATUS_HEX['結案']}">${closed}</div></div>
+      ${statusCounts.map(({ status, count }) => `
+        <div class="kpi-seg"><div class="kpi-label">${esc(status)}</div><div class="kpi-val mono" style="color:${STATUS_HEX[status]}">${count}</div></div>`).join('')}
     </div>
     <div class="stat-row">
       <div class="stat-box"><div class="kpi-label">年度總預算</div><div class="stat-num">NT$ ${fmt(totalBudget)}</div></div>
@@ -81,7 +86,8 @@ async function renderDashboard(){
 // ── CAMPAIGNS：總表 ──
 async function renderCampaignsPage(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
-  CAMPAIGNS = await GET('marketing_campaigns?order=created_at.desc') || [];
+  const data = await GET('marketing_campaigns?order=created_at.desc') || [];
+  CAMPAIGNS = sortByStatus(data);
   _campaignView = 'list';
   _renderCampaignsBody();
 }
@@ -257,7 +263,7 @@ function openCampaignModal(id){
   document.getElementById('cm-subsidy-planned').value = c?.subsidy_planned ?? '';
   document.getElementById('cm-subsidy-received').value = c?.subsidy_received ?? '';
   document.getElementById('cm-purpose').value = c?.purpose || '';
-  document.getElementById('cm-status').value = c?.status || '估價';
+  document.getElementById('cm-status').value = c?.status || '預計規劃';
   document.getElementById('cm-owner').value = c?.owner || '';
   vendorRows = Array.isArray(c?.vendors) ? [...c.vendors] : [];
   renderVendorRows();
@@ -308,7 +314,7 @@ async function saveCampaign(){
   if (editCampaignId) await PATCH(`marketing_campaigns?id=eq.${editCampaignId}`, payload);
   else { const r = await POST('marketing_campaigns', payload); savedId = r?.[0]?.id; }
   closeM('mcampaign');
-  CAMPAIGNS = await GET('marketing_campaigns?order=created_at.desc') || [];
+  CAMPAIGNS = sortByStatus(await GET('marketing_campaigns?order=created_at.desc') || []);
   if (savedId && detailCampaignId === savedId) await campaignDetail(savedId);
   else if (_view === 'campaigns') _renderCampaignsBody();
   else await nav(_view);
