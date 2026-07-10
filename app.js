@@ -241,7 +241,7 @@ async function renderDashboard(){
         <div class="dash-list">${upcomingRows}</div>
       </div>
       <div class="card dash-panel">
-        <div class="dash-panel-head"><div><div class="kpi-label">總經理視角</div><div class="dash-panel-title">待決策事項</div></div></div>
+        <div class="dash-panel-head"><div><div class="kpi-label">管理追蹤</div><div class="dash-panel-title">待決策事項</div></div></div>
         <div class="dash-list">${decisionRows}</div>
       </div>
       <div class="card dash-panel">
