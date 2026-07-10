@@ -4,29 +4,68 @@
 - 日期：2026-07-10
 - 執行裝置：M1（Claude Code）
 
-## 本次完成（2026-07-10）
-- 專案初始化：純 HTML/JS + Supabase 架構，參考 WOWCasa 的 core/config.js、core/api.js、core/auth.js 模式
-- 建立 `schema.sql`：`marketing_campaigns`（行銷案：專案名稱/總預算/實際花費/配合單位/預期目的/進度[估價/進行中/結案]/委託第三方/時程）、`marketing_content_drafts`（每週文案草稿）
-- `index.html` + `app.js`：
-  - 總覽頁：KPI（案量、預算、執行率）+ 最近行銷案
-  - 行銷案管理：清單 + 新增/編輯/刪除 Modal + 甘特圖 toggle（沿用 WOWCasa 專案管理的甘特圖邏輯）
-  - 每週文案彙整：依週分組顯示草稿，可新增/編輯/刪除，「複製」按鈕可一鍵複製單則或整週文案到剪貼簿，貼到 Facebook 或 Google Sheet
-- v1 範圍決策：新聞蒐集／AI 文案生成／Google Sheet 自動匯出**先不做自動化**，改為使用者手動輸入 + 一鍵複製，待使用者確認自動化的新聞來源、LLM 金鑰、Google Sheets API 憑證後再串接
+## 部署與帳號資訊
+- GitHub：https://github.com/Meishentech/marketing
+- Cloudflare Pages：https://marketing-a4l.pages.dev（push 到 main 自動部署）
+- Supabase project：`apgrclmrkarxlajmhnpa`（獨立帳號，非 WOWCasa 的 AICasa 組織，Claude 端 Supabase MCP 無法直接操作，schema 變更需請使用者手動在 Dashboard SQL Editor 執行）
+- 登入測試帳號：test@mcttw.com.tw
+- Cloudflare Pages 環境變數：`RSS2JSON_API_KEY`（新聞蒐集用）
+- GitHub Secrets（供每週自動文案排程用）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`RSS2JSON_API_KEY`、`ANTHROPIC_API_KEY`
+
+## 功能總覽（截至本次）
+
+### 1. 行銷案管理
+- 總表只顯示專案名稱／執行狀態／預算，**自動依狀態分組排序**（預計規劃→估價中→進行中→補助申請→結案，同狀態內依建立時間新到舊）
+- 點擊進入詳情頁：專案說明／專案時間（預計+實際）／專案預算（含美的預計補助、已核發補助）／負責人／負責單位（主要配合單位，可＋新增）／負責公司（外包，可複數）／備註
+- 時程圖（Gantt）toggle 切換
+- 總表可「匯出 Excel」（CSV，Excel 可直接開）
+- 狀態顏色沿用冷媒循環溫度隱喻：預計規劃(灰)/估價中(黃銅)/進行中(冷媒藍綠)/補助申請(鋼藍)/結案(深藍綠)
+
+### 2. 新聞蒐集
+- 依關鍵字抓 Google News RSS，經 `functions/api/news.js`（Cloudflare Pages Function）→ rss2json.com 中轉（**必須**用 API key，匿名額度太低會 429/500；直接抓 Google 會被封鎖回傳 503「Sorry...」機器人偵測頁）
+- 可新增/刪除關鍵字，抓到的新聞可一鍵「＋建立文案草稿」帶入標題/連結
+
+### 3. 每週文案彙整
+- 手動：依週分組顯示草稿，新增/編輯/刪除，「複製」單則或整週到剪貼簿
+- **自動**（`.github/workflows/weekly-content.yml` + `scripts/generate-weekly-content.mjs`）：
+  - 每週一台北時間 08:00 排程，也可在 GitHub Actions 頁面手動 "Run workflow" 測試
+  - 抓新聞 → 避免重複（比對 source_note）→ Claude Haiku 生成文案 → 寫入 `marketing_content_drafts`，**狀態強制為「草稿」，絕不自動發布**
+  - 文案要求：行銷總監視角、面向專業空調技師（非一般消費者）、專業精準不浮誇、換行分段＋適度專業 icon（⚙️❄️📊 類，非誇張表情符號）＋文末 3-5 個 hashtag、禁止 markdown 語法
+  - 提示詞內建真實產品資訊（`PRODUCT_REFERENCE`，取自 www.mcttw.com.tw：MagBoost Apex/MagBoost/變頻直驅/AirBoost MAG 各系列規格），**只能引用真實規格，不可捏造**；曾在測試中出現「Modbus」被幻覺成「Mod875」，人工審核時要特別注意技術名詞
+  - 若產品線異動，`PRODUCT_REFERENCE` 需同步更新，否則文案會用到過時資訊
+
+### 4. 成功案例（新）
+- 原廠案例照片的處理流程：**不走自動化 API**，直接把照片貼到 Claude Code 對話裡，由 Claude 讀圖翻譯（簡體→繁體＋台灣業界用語）＋整理重點，再用 Canva MCP（已連結美昇品牌套件）產出設計
+- 整理完的資訊存入「成功案例」專區：標題／案場／產品型號／案例摘要／成效數字／標籤／封面照片（Supabase Storage）／Canva 設計連結
+- `core/api.js` 新增 storage 輔助函式：`uploadStorageFile`、`getSignedUrl`、`deleteStorageFile`、`storageSafeFileName`
+
+## 視覺設計
+- 全站重新設計過，脫離制式 AI 儀表板樣板：Big Shoulders Display（工業感標題字體）+ IBM Plex Sans/Mono（內文/數據），冷媒藍綠＋黃銅＋鋼藍的工程儀表色系，取代預設 blue/navy SaaS 樣板
+- 官方 logo（`assets/logo.png`）用於登入頁（原色）與側邊欄（filter 反白）
+- 有響應式設計（手機版側邊欄變橫向 tab bar、表單單欄化）
+
+## Schema 版本（依序在 Supabase SQL Editor 執行）
+1. `schema.sql`：`marketing_campaigns`、`marketing_content_drafts` 基礎表
+2. `schema_v2_news.sql`：`marketing_news_keywords`
+3. `schema_v3_fields.sql`：`owner`、`owner_unit`
+4. `schema_v4_vendors.sql`：`vendors` jsonb（取代單一 vendor 欄位）
+5. `schema_v5_subsidy.sql`：`subsidy_planned`、`subsidy_received`
+6. `schema_v6_status.sql`：狀態改 5 種（含資料轉換＋新 check constraint，**已修正為可安全重跑**）
+7. `schema_v7_case_studies.sql`：`marketing_case_studies` 表 + `case-study-photos` storage bucket（**已修正為可安全重跑**）
+
+⚠️ 全部都已在正式 Supabase project 執行過並驗證成功。若要在新環境重建，依序執行 v1~v7 即可。
+
+## 已知決策與限制
+- **不做 Google Sheet 自動匯出**（尚未串接，需要 Google Sheets API service account 憑證，使用者尚未提供）
+- 文案自動生成**已改為使用者同意接受小額 Anthropic API 費用**（Claude Haiku，估計月費台幣幾十元等級），前提是「一律進草稿、絕不自動發布」的規則不可放寬
+- 每週文案排程若跑到「文章重複」會跳過該關鍵字，不會硬產出重複內容
+- 「10月空調展」等既有行銷案資料是從 Google Sheet《美昇舒適｜2026年行銷計畫預算進度管理表》匯入 14 筆＋更新 1 筆，匯入時上半年活動的「實際花費」照抄 sheet，下半年活動因為 sheet 備註寫「尚未執行」所以刻意留空未匯入實際花費/已核發補助
 
 ## 下一步待辦
-- [ ] 使用者建立自己的 Supabase project，回填 `core/config.js` 的 `SB` / `KEY`
-- [ ] 執行 `schema.sql`，並在 Supabase Authentication 建立登入帳號
-- [ ] 本機開啟 index.html 驗證登入、行銷案 CRUD、甘特圖、文案彙整流程
-- [ ] 確認是否要推上 GitHub（repo 名稱、public/private）與部署到 Cloudflare Pages
-- [ ] 若要做新聞自動蒐集：決定新聞來源（RSS 優先，避免直接爬 Google News 網頁的 ToS 風險）
-- [ ] 若要做 AI 文案自動生成：需要 Claude API 金鑰，且流程需保留人工審核草稿的步驟（不建議全自動發布）
-- [ ] 若要做 Google Sheet 自動匯出：需要 Google Sheets API service account 憑證，且需要一個排程觸發點（Supabase Edge Function 或 Cloudflare Cron Trigger）
+- [ ] 使用者實際使用「成功案例」功能：貼原廠照片進 Claude 對話 → 翻譯整理 → Canva 出圖 → 存入案例庫
+- [ ] 觀察每週自動文案品質，特別留意技術名詞是否被 AI 幻覺（例如 Modbus 曾被誤寫成 Mod875）
+- [ ] 若要做 Google Sheet 自動匯出，需要使用者提供 Google Cloud service account 憑證
+- [ ] 「預計規劃」「補助申請」兩個新狀態目前尚無真實資料落在裡面，待使用者實際分類既有/新增行銷案
 
 ## 未解決問題
-- 無（v1 尚未連接真實 Supabase project，尚未實機驗證）
-
-## 專案現況
-- index.html：單頁應用（登入 + 側邊欄 + 總覽/行銷案/文案彙整三頁）
-- app.js：行銷案與文案彙整的渲染與 CRUD 邏輯
-- core/：config.js（Supabase 連線設定，待填）、api.js（GET/POST/PATCH/DEL）、auth.js（登入/登出/session）
-- schema.sql：Supabase 資料表定義（尚未執行，等使用者提供 Supabase project）
+- 無
