@@ -469,23 +469,58 @@ function taskStatusTag(status){
   return `<span class="tag tag-${cls}">${esc(status)}</span>`;
 }
 
+function ymdCompact(s){
+  return (s || '').replaceAll('-', '');
+}
+
+function googleCalendarTaskUrl(task){
+  const c = detailCampaignCache;
+  const start = task.planned_start || task.planned_end;
+  if (!start) return '';
+  const endDate = task.planned_end || task.planned_start || start;
+  const startText = ymdCompact(start);
+  const end = new Date(`${endDate}T00:00:00`);
+  end.setDate(end.getDate() + 1);
+  const endText = end.toISOString().slice(0, 10).replaceAll('-', '');
+  const details = [
+    `專案：${c?.name || ''}`,
+    `任務：${task.task_name}`,
+    `負責人：${task.owner || '-'}`,
+    `狀態：${task.status || '-'}`,
+    `完成率：${Math.round(Number(task.completion_pct) || 0)}%`,
+    task.expected_output ? `預期成果：${task.expected_output}` : '',
+    task.notes ? `備註：${task.notes}` : ''
+  ].filter(Boolean).join('\n');
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `[美昇行銷] ${c?.name || ''}｜${task.task_name}`,
+    dates: `${startText}/${endText}`,
+    details
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 function renderTasksBlock(tasks){
-  const rows = tasks.map(t => `
-    <tr onclick="openTaskModal('${t.id}')">
-      <td class="mono" style="width:36px">${t.seq ?? ''}</td>
-      <td class="tb-name">${esc(t.task_name)}</td>
-      <td>${esc(t.owner || '-')}</td>
-      <td class="mono" style="white-space:nowrap">${t.planned_start ? fd(t.planned_start) : '-'}${t.planned_end ? ' – ' + fd(t.planned_end) : ''}</td>
-      <td>${taskStatusTag(t.status)}</td>
-      <td style="min-width:100px">
-        <div class="kpi-bar" style="background:var(--line)"><i style="width:${Math.min(100, Number(t.completion_pct) || 0)}%;background:var(--teal)"></i></div>
-        <div class="muted-text mono" style="margin-top:3px">${Math.round(Number(t.completion_pct) || 0)}%</div>
-      </td>
-    </tr>`).join('');
+  const rows = tasks.map(t => {
+    const calendarUrl = googleCalendarTaskUrl(t);
+    return `
+      <tr onclick="openTaskModal('${t.id}')">
+        <td class="mono" style="width:36px">${t.seq ?? ''}</td>
+        <td class="tb-name">${esc(t.task_name)}</td>
+        <td>${esc(t.owner || '-')}</td>
+        <td class="mono" style="white-space:nowrap">${t.planned_start ? fd(t.planned_start) : '-'}${t.planned_end ? ' – ' + fd(t.planned_end) : ''}</td>
+        <td>${taskStatusTag(t.status)}</td>
+        <td style="min-width:100px">
+          <div class="kpi-bar" style="background:var(--line)"><i style="width:${Math.min(100, Number(t.completion_pct) || 0)}%;background:var(--teal)"></i></div>
+          <div class="muted-text mono" style="margin-top:3px">${Math.round(Number(t.completion_pct) || 0)}%</div>
+        </td>
+        <td onclick="event.stopPropagation()">${calendarUrl ? `<a href="${calendarUrl}" target="_blank" rel="noopener">加入日曆</a>` : '-'}</td>
+      </tr>`;
+  }).join('');
   return `
     <div class="tw">
       <table>
-        <thead><tr><th>#</th><th>任務／里程碑</th><th>負責人</th><th>預計時程</th><th>狀態</th><th>完成率</th></tr></thead>
+        <thead><tr><th>#</th><th>任務／里程碑</th><th>負責人</th><th>預計時程</th><th>狀態</th><th>完成率</th><th>日曆</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${rows ? '' : '<div class="empty">尚無任務，點擊「＋ 新增任務」開始規劃</div>'}
@@ -790,6 +825,10 @@ function openTaskModal(id){
   document.getElementById('tm-output').value = t?.expected_output || '';
   document.getElementById('tm-notes').value = t?.notes || '';
   document.getElementById('tm-delete').style.display = id ? '' : 'none';
+  const cal = document.getElementById('tm-calendar-link');
+  const url = t ? googleCalendarTaskUrl(t) : '';
+  cal.style.display = url ? '' : 'none';
+  cal.href = url || '#';
   openM('mtask');
 }
 
