@@ -55,6 +55,7 @@
 ### 6. 成功案例（新）
 - 原廠案例照片的處理流程：**不走自動化 API**，直接把照片貼到 Claude Code 對話裡，由 Claude 讀圖翻譯（簡體→繁體＋台灣業界用語）＋整理重點，再用 Canva MCP（已連結美昇品牌套件）產出設計
 - 整理完的資訊存入「成功案例」專區：標題／案場／產品型號／案例摘要／成效數字／標籤／封面照片（Supabase Storage）／Canva 設計連結
+- 成功案例列表與編輯視窗已支援登入後下載封面圖片，讓業務可自行查詢並下載案例素材。
 - `core/api.js` 新增 storage 輔助函式：`uploadStorageFile`、`getSignedUrl`、`deleteStorageFile`、`storageSafeFileName`
 
 ## 視覺設計

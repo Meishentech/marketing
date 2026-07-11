@@ -4,6 +4,7 @@ const fmt = n => n == null || n === '' ? '-' : Number(n).toLocaleString('zh-TW')
 const fd  = s => s ? s.slice(5).replace('-', '/') : '';
 const fdFull = s => s ? s.replace(/-/g, '/') : '未填';
 const todayISO = () => new Date().toISOString().slice(0, 10);
+const safeDownloadName = (name, ext = 'png') => `${(name || 'download').replace(/[\\/:*?"<>|]+/g, '_')}.${ext}`;
 
 // 狀態沿用冷媒循環的溫度隱喻：預計規劃＝尚未升溫（灰），估價中＝尚未啟動（黃銅），進行中＝正在冷卻（冷媒藍綠），補助申請＝行政作業（鋼藍），結案＝完全冷卻（深藍綠）
 const STATUS_ORDER = ['預計規劃', '估價中', '進行中', '補助申請', '結案'];
@@ -1706,6 +1707,7 @@ async function renderCasesPage(){
         <div class="case-meta">${esc(c.project_name || '')}${c.product_model ? ' · ' + esc(c.product_model) : ''}</div>
         ${c.metrics ? `<div class="case-meta" style="margin-top:4px;color:var(--teal)">${esc(c.metrics)}</div>` : ''}
         <div class="case-tags">${tagsHtml}</div>
+        ${coverUrl ? `<div class="case-actions"><button class="case-download" data-path="${esc(c.cover_image_path)}" data-title="${esc(c.title)}" onclick="event.stopPropagation();downloadCaseImageFromButton(this)">下載圖片</button></div>` : ''}
       </div>
     </div>`;
   }));
@@ -1737,7 +1739,7 @@ async function openCaseModal(id){
   const preview = document.getElementById('cs-cover-preview');
   if (currentCoverPath) {
     const url = await getSignedUrl('case-study-photos', currentCoverPath);
-    preview.innerHTML = url ? `<img src="${url}" style="max-width:200px;display:block">` : '';
+    preview.innerHTML = url ? `<img src="${url}" style="max-width:200px;display:block"><div class="case-actions"><button class="case-download" data-path="${esc(currentCoverPath)}" data-title="${esc(c?.title)}" onclick="downloadCaseImageFromButton(this)">下載圖片</button></div>` : '';
   } else {
     preview.innerHTML = '';
   }
@@ -1750,6 +1752,31 @@ function onCoverFilePick(input){
   pendingCoverFile = input.files[0] || null;
   const preview = document.getElementById('cs-cover-preview');
   if (pendingCoverFile) preview.innerHTML = `<span class="muted-text">待上傳：${esc(pendingCoverFile.name)}</span>`;
+}
+
+async function downloadCaseImageFromButton(btn){
+  await downloadCaseImage(btn.dataset.path, btn.dataset.title);
+}
+
+async function downloadCaseImage(path, title){
+  if (!path) return;
+  const url = await getSignedUrl('case-study-photos', path, 300);
+  if (!url) { alert('圖片下載連結產生失敗，請重新登入後再試。'); return; }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(await res.text());
+    const blob = await res.blob();
+    const ext = (path.split('.').pop() || 'png').split('?')[0];
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = safeDownloadName(title, ext);
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  } catch (e) {
+    window.open(url, '_blank', 'noopener');
+  }
 }
 
 async function saveCaseStudy(){
