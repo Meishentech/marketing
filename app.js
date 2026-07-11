@@ -26,6 +26,8 @@ let BUDGET_ITEMS = [];
 let DOCS = [];
 let RISKS = [];
 let RISK_UPDATES = [];
+let PERFORMANCE = [];
+let RESOURCES = [];
 let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
@@ -35,6 +37,8 @@ let editTaskId = null;
 let editBudgetItemId = null;
 let editDocId = null;
 let editRiskId = null;
+let editPerformanceId = null;
+let editResourceId = null;
 let quickRiskId = null;
 let detailCampaignId = null;
 let detailCampaignCache = null;
@@ -54,6 +58,8 @@ async function nav(view){
   else if (view === 'drafts') await renderDraftsPage();
   else if (view === 'news') await renderNewsPage();
   else if (view === 'cases') await renderCasesPage();
+  else if (view === 'performance') await renderPerformancePage();
+  else if (view === 'resources') await renderResourcesPage();
 }
 
 function tag(status){
@@ -1128,6 +1134,191 @@ async function delDocument(){
   await DEL(`marketing_campaign_documents?id=eq.${editDocId}`);
   closeM('mdoc');
   await campaignDetail(detailCampaignId);
+}
+
+// ── PERFORMANCE ──
+function costPer(amount, count){
+  return count ? Math.round((Number(amount) || 0) / count) : 0;
+}
+
+async function renderPerformancePage(){
+  document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
+  CAMPAIGNS = await GET('marketing_campaigns?order=created_at.desc') || [];
+  PERFORMANCE = await safeGET('marketing_campaign_performance?order=updated_at.desc');
+  const campaignById = Object.fromEntries(CAMPAIGNS.map(c => [c.id, c]));
+  const totalLeads = PERFORMANCE.reduce((s, p) => s + (Number(p.lead_count) || 0), 0);
+  const totalQualified = PERFORMANCE.reduce((s, p) => s + (Number(p.qualified_lead_count) || 0), 0);
+  const totalDealAmount = PERFORMANCE.reduce((s, p) => s + (Number(p.deal_amount) || 0), 0);
+  const rows = PERFORMANCE.map(p => {
+    const c = campaignById[p.campaign_id];
+    const spend = Number(c?.actual_spend || c?.budget) || 0;
+    return `<tr onclick="openPerformanceModal('${p.id}')">
+      <td class="tb-name">${esc(c?.name || '未連結專案')}</td>
+      <td class="mono">${fmt(p.reach_count)}</td>
+      <td class="mono">${fmt(p.lead_count)}</td>
+      <td class="mono">${fmt(p.qualified_lead_count)}</td>
+      <td class="mono">NT$ ${fmt(costPer(spend, p.lead_count))}</td>
+      <td class="mono">NT$ ${fmt(costPer(spend, p.qualified_lead_count))}</td>
+      <td class="mono">NT$ ${fmt(p.deal_amount)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('vc').innerHTML = `
+    <div class="ph"><div><div class="pt">成效查詢</div><div class="ps">用成效數字判斷活動是否值得持續投入</div></div>
+      <button class="btn btn-primary" onclick="openPerformanceModal()">＋ 新增成效</button></div>
+    <div class="dash-kpi-grid">
+      <div class="stat-box"><div class="kpi-label">總名單數</div><div class="stat-num mono">${fmt(totalLeads)}</div></div>
+      <div class="stat-box"><div class="kpi-label">有效商機</div><div class="stat-num mono">${fmt(totalQualified)}</div></div>
+      <div class="stat-box"><div class="kpi-label">成交貢獻</div><div class="stat-num mono">NT$ ${fmt(totalDealAmount)}</div></div>
+      <div class="stat-box"><div class="kpi-label">已建成效專案</div><div class="stat-num mono">${PERFORMANCE.length}</div></div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>專案</th><th>觸及</th><th>名單</th><th>有效商機</th><th>名單成本</th><th>有效商機成本</th><th>成交金額</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${rows ? '' : '<div class="empty">尚無成效資料，點擊「＋ 新增成效」開始記錄</div>'}
+    </div>`;
+}
+
+function performanceCampaignOptions(selected){
+  return CAMPAIGNS.map(c => `<option value="${c.id}" ${selected === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+}
+
+function openPerformanceModal(id){
+  editPerformanceId = id || null;
+  const p = id ? PERFORMANCE.find(x => x.id === id) : null;
+  document.getElementById('pm-title').textContent = id ? '編輯成效' : '新增成效';
+  document.getElementById('pm-campaign').innerHTML = performanceCampaignOptions(p?.campaign_id || CAMPAIGNS[0]?.id);
+  document.getElementById('pm-reach').value = p?.reach_count ?? 0;
+  document.getElementById('pm-leads').value = p?.lead_count ?? 0;
+  document.getElementById('pm-inquiries').value = p?.inquiry_count ?? 0;
+  document.getElementById('pm-qualified').value = p?.qualified_lead_count ?? 0;
+  document.getElementById('pm-opportunity').value = p?.estimated_opportunity_amount ?? 0;
+  document.getElementById('pm-deals').value = p?.deal_count ?? 0;
+  document.getElementById('pm-deal-amount').value = p?.deal_amount ?? 0;
+  document.getElementById('pm-notes').value = p?.notes || '';
+  document.getElementById('pm-delete').style.display = id ? '' : 'none';
+  openM('mperformance');
+}
+
+async function savePerformance(){
+  const payload = {
+    campaign_id: document.getElementById('pm-campaign').value,
+    reach_count: Number(document.getElementById('pm-reach').value) || 0,
+    lead_count: Number(document.getElementById('pm-leads').value) || 0,
+    inquiry_count: Number(document.getElementById('pm-inquiries').value) || 0,
+    qualified_lead_count: Number(document.getElementById('pm-qualified').value) || 0,
+    estimated_opportunity_amount: Number(document.getElementById('pm-opportunity').value) || 0,
+    deal_count: Number(document.getElementById('pm-deals').value) || 0,
+    deal_amount: Number(document.getElementById('pm-deal-amount').value) || 0,
+    notes: document.getElementById('pm-notes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (editPerformanceId) await PATCH(`marketing_campaign_performance?id=eq.${editPerformanceId}`, payload);
+    else await POST('marketing_campaign_performance', payload);
+  } catch (e) {
+    alert('成效資料表尚未啟用，請先在 Supabase SQL Editor 執行 schema_v12_performance_resources.sql。');
+    return;
+  }
+  closeM('mperformance');
+  await renderPerformancePage();
+}
+
+async function delPerformance(){
+  if (!editPerformanceId) return;
+  if (!confirm('確定刪除此成效資料？')) return;
+  await DEL(`marketing_campaign_performance?id=eq.${editPerformanceId}`);
+  closeM('mperformance');
+  await renderPerformancePage();
+}
+
+// ── RESOURCES ──
+async function renderResourcesPage(){
+  document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
+  RESOURCES = await safeGET('marketing_resources?order=updated_at.desc');
+  const types = Object.entries(RESOURCES.reduce((acc, r) => {
+    acc[r.resource_type] = (acc[r.resource_type] || 0) + 1;
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]);
+  const rows = RESOURCES.map(r => `
+    <tr onclick="openResourceModal('${r.id}')">
+      <td><span class="case-tag">${esc(r.resource_type)}</span></td>
+      <td class="tb-name">${esc(r.title)}${r.product_line ? `<div class="muted-text">${esc(r.product_line)}</div>` : ''}</td>
+      <td>${esc(r.audience || '-')}</td>
+      <td>${esc(r.version || '-')}</td>
+      <td>${r.is_external_usable ? '<span class="tag tag-teal">可對外</span>' : '<span class="tag tag-muted">內部</span>'}</td>
+      <td onclick="event.stopPropagation()">${r.resource_url ? `<a href="${esc(r.resource_url)}" target="_blank" rel="noopener">開啟</a>` : '-'}</td>
+    </tr>`).join('');
+  document.getElementById('vc').innerHTML = `
+    <div class="ph"><div><div class="pt">行銷資源庫</div><div class="ps">集中查詢簡報、DM、型錄、技術文章與可對外素材</div></div>
+      <button class="btn btn-primary" onclick="openResourceModal()">＋ 新增資源</button></div>
+    <div class="dash-kpi-grid">
+      <div class="stat-box"><div class="kpi-label">資源總數</div><div class="stat-num mono">${RESOURCES.length}</div></div>
+      <div class="stat-box"><div class="kpi-label">可對外使用</div><div class="stat-num mono">${RESOURCES.filter(r => r.is_external_usable).length}</div></div>
+      <div class="stat-box"><div class="kpi-label">最多類型</div><div class="stat-num" style="font-size:24px">${esc(types[0]?.[0] || '-')}</div></div>
+      <div class="stat-box"><div class="kpi-label">分類數</div><div class="stat-num mono">${types.length}</div></div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>類型</th><th>資源名稱</th><th>對象</th><th>版本</th><th>權限</th><th>連結</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${rows ? '' : '<div class="empty">尚無行銷資源，點擊「＋ 新增資源」開始建立</div>'}
+    </div>`;
+}
+
+function openResourceModal(id){
+  editResourceId = id || null;
+  const r = id ? RESOURCES.find(x => x.id === id) : null;
+  document.getElementById('res-title-label').textContent = id ? '編輯資源' : '新增資源';
+  document.getElementById('res-name').value = r?.title || '';
+  document.getElementById('res-type').value = r?.resource_type || '其他';
+  document.getElementById('res-product').value = r?.product_line || '';
+  document.getElementById('res-audience').value = r?.audience || '';
+  document.getElementById('res-version').value = r?.version || '';
+  document.getElementById('res-url').value = r?.resource_url || '';
+  document.getElementById('res-canva').value = r?.canva_url || '';
+  document.getElementById('res-external').checked = r?.is_external_usable || false;
+  document.getElementById('res-tags').value = (r?.tags || []).join('、');
+  document.getElementById('res-notes').value = r?.notes || '';
+  document.getElementById('res-delete').style.display = id ? '' : 'none';
+  openM('mresource');
+}
+
+async function saveResource(){
+  const title = document.getElementById('res-name').value.trim();
+  if (!title) { alert('請輸入資源名稱'); return; }
+  const payload = {
+    title,
+    resource_type: document.getElementById('res-type').value,
+    product_line: document.getElementById('res-product').value.trim() || null,
+    audience: document.getElementById('res-audience').value.trim() || null,
+    version: document.getElementById('res-version').value.trim() || null,
+    resource_url: document.getElementById('res-url').value.trim() || null,
+    canva_url: document.getElementById('res-canva').value.trim() || null,
+    is_external_usable: document.getElementById('res-external').checked,
+    tags: document.getElementById('res-tags').value.split(/[、,]/).map(x => x.trim()).filter(Boolean),
+    notes: document.getElementById('res-notes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (editResourceId) await PATCH(`marketing_resources?id=eq.${editResourceId}`, payload);
+    else await POST('marketing_resources', payload);
+  } catch (e) {
+    alert('行銷資源資料表尚未啟用，請先在 Supabase SQL Editor 執行 schema_v12_performance_resources.sql。');
+    return;
+  }
+  closeM('mresource');
+  await renderResourcesPage();
+}
+
+async function delResource(){
+  if (!editResourceId) return;
+  if (!confirm('確定刪除此行銷資源？')) return;
+  await DEL(`marketing_resources?id=eq.${editResourceId}`);
+  closeM('mresource');
+  await renderResourcesPage();
 }
 
 function distinctUnits(){

@@ -279,6 +279,8 @@ tbody tr:last-child td{border-bottom:none}
   <nav>
     <div class="ni" data-view="dashboard" onclick="nav('dashboard')">總覽</div>
     <div class="ni" data-view="campaigns" onclick="nav('campaigns')">行銷案管理</div>
+    <div class="ni" data-view="performance" onclick="nav('performance')">成效查詢</div>
+    <div class="ni" data-view="resources" onclick="nav('resources')">行銷資源庫</div>
     <div class="ni" data-view="news" onclick="nav('news')">新聞蒐集</div>
     <div class="ni" data-view="drafts" onclick="nav('drafts')">每週文案彙整</div>
     <div class="ni" data-view="cases" onclick="nav('cases')">成功案例</div>
@@ -383,6 +385,61 @@ tbody tr:last-child td{border-bottom:none}
       <button class="btn btn-red" id="bm-delete" onclick="delBudgetItem()">刪除</button>
       <button class="btn btn-outline" onclick="closeM('mbudget')">取消</button>
       <button class="btn btn-primary" onclick="saveBudgetItem()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 行銷成效 modal -->
+<div class="mo" id="mperformance">
+  <div class="md">
+    <div class="mh"><div class="mt" id="pm-title">新增行銷成效</div><button class="mc" onclick="closeM('mperformance')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1 ff"><label class="fl">關聯行銷案 *</label><select id="pm-campaign"></select></div>
+        <div class="fg1"><label class="fl">觸及人數</label><input id="pm-reach" type="number" min="0"></div>
+        <div class="fg1"><label class="fl">名單數</label><input id="pm-leads" type="number" min="0"></div>
+        <div class="fg1"><label class="fl">詢問數</label><input id="pm-inquiries" type="number" min="0"></div>
+        <div class="fg1"><label class="fl">有效商機數</label><input id="pm-qualified" type="number" min="0"></div>
+        <div class="fg1"><label class="fl">預估商機金額</label><input id="pm-opportunity" type="number" min="0"></div>
+        <div class="fg1"><label class="fl">成交件數</label><input id="pm-deals" type="number" min="0"></div>
+        <div class="fg1"><label class="fl">成交金額</label><input id="pm-deal-amount" type="number" min="0"></div>
+        <div class="fg1 ff"><label class="fl">備註</label><textarea id="pm-notes" placeholder="例如 名單來源、轉換品質、需追蹤的客戶類型"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-red" id="pm-delete" onclick="delPerformance()">刪除</button>
+      <button class="btn btn-outline" onclick="closeM('mperformance')">取消</button>
+      <button class="btn btn-primary" onclick="savePerformance()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 行銷資源 modal -->
+<div class="mo" id="mresource">
+  <div class="md">
+    <div class="mh"><div class="mt" id="res-title-label">新增行銷資源</div><button class="mc" onclick="closeM('mresource')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fg1 ff"><label class="fl">資源名稱 *</label><input id="res-name" placeholder="例如 MagBoost Apex 技術簡報"></div>
+        <div class="fg1"><label class="fl">類型</label>
+          <select id="res-type"><option>簡報</option><option>DM</option><option>型錄</option><option>技術文章</option><option>期刊投稿</option><option>展場素材</option><option>社群文案</option><option>圖片影片</option><option>案例</option><option>其他</option></select>
+        </div>
+        <div class="fg1"><label class="fl">產品線</label><input id="res-product" placeholder="例如 CDU / FANWALL / MagBoost"></div>
+        <div class="fg1"><label class="fl">適用對象</label><input id="res-audience" placeholder="例如 業務、技師、代理商、原廠"></div>
+        <div class="fg1"><label class="fl">版本</label><input id="res-version" placeholder="例如 v1 2026-07"></div>
+        <div class="fg1 ff"><label class="fl">資源連結</label><input id="res-url" placeholder="Google Drive、官網或檔案連結"></div>
+        <div class="fg1 ff"><label class="fl">Canva 連結</label><input id="res-canva" placeholder="https://www.canva.com/..."></div>
+        <div class="fg1"><label class="fl">對外使用</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);padding-top:9px"><input id="res-external" type="checkbox" style="width:auto"> 業務可直接提供客戶</label>
+        </div>
+        <div class="fg1 ff"><label class="fl">標籤</label><input id="res-tags" placeholder="用逗號分隔，例如 節能, 技術投稿, 空調展"></div>
+        <div class="fg1 ff"><label class="fl">備註</label><textarea id="res-notes" placeholder="例如 使用限制、更新來源、下次改版方向"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-red" id="res-delete" onclick="delResource()">刪除</button>
+      <button class="btn btn-outline" onclick="closeM('mresource')">取消</button>
+      <button class="btn btn-primary" onclick="saveResource()">儲存</button>
     </div>
   </div>
 </div>

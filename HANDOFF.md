@@ -28,11 +28,21 @@
 - 總表可「匯出 Excel」（CSV，Excel 可直接開，含新增的補助/請款欄位）
 - 狀態顏色沿用冷媒循環溫度隱喻：預計規劃(灰)/估價中(黃銅)/進行中(冷媒藍綠)/補助申請(鋼藍)/結案(深藍綠)
 
-### 2. 新聞蒐集
+### 2. 行銷成效查詢
+- 新增獨立頁面「成效查詢」，不再塞進首頁 Dashboard，避免首頁資訊過載。
+- 每個行銷案可維護一筆成效資料：觸及人數、名單數、詢問數、有效商機數、預估商機金額、成交件數、成交金額、備註。
+- 頁面自動彙總總觸及、總名單、總有效商機、總成交金額，並依行銷案預算估算每名單成本與每有效商機成本，供總經理/行銷端快速比較活動效率。
+
+### 3. 行銷資源庫
+- 新增獨立頁面「行銷資源庫」，集中管理簡報、DM、型錄、技術文章、期刊投稿、展場素材、社群文案、圖片影片、案例與其他素材。
+- 每筆資源可記錄產品線、適用對象、版本、資源連結、Canva 連結、是否可對外使用、標籤與備註。
+- 業務只需要查行銷相關資料時，可從此頁快速找到可對外提供的素材，不混入業務自己的商機管理平台。
+
+### 4. 新聞蒐集
 - 依關鍵字抓 Google News RSS，經 `functions/api/news.js`（Cloudflare Pages Function）→ rss2json.com 中轉（**必須**用 API key，匿名額度太低會 429/500；直接抓 Google 會被封鎖回傳 503「Sorry...」機器人偵測頁）
 - 可新增/刪除關鍵字，抓到的新聞可一鍵「＋建立文案草稿」帶入標題/連結
 
-### 3. 每週文案彙整
+### 5. 每週文案彙整
 - 手動：依週分組顯示草稿，新增/編輯/刪除，「複製」單則或整週到剪貼簿
 - **自動**（`.github/workflows/weekly-content.yml` + `scripts/generate-weekly-content.mjs`）：
   - 每週一台北時間 08:00 排程，也可在 GitHub Actions 頁面手動 "Run workflow" 測試
@@ -41,7 +51,7 @@
   - 提示詞內建真實產品資訊（`PRODUCT_REFERENCE`，取自 www.mcttw.com.tw：MagBoost Apex/MagBoost/變頻直驅/AirBoost MAG 各系列規格），**只能引用真實規格，不可捏造**；曾在測試中出現「Modbus」被幻覺成「Mod875」，人工審核時要特別注意技術名詞
   - 若產品線異動，`PRODUCT_REFERENCE` 需同步更新，否則文案會用到過時資訊
 
-### 4. 成功案例（新）
+### 6. 成功案例（新）
 - 原廠案例照片的處理流程：**不走自動化 API**，直接把照片貼到 Claude Code 對話裡，由 Claude 讀圖翻譯（簡體→繁體＋台灣業界用語）＋整理重點，再用 Canva MCP（已連結美昇品牌套件）產出設計
 - 整理完的資訊存入「成功案例」專區：標題／案場／產品型號／案例摘要／成效數字／標籤／封面照片（Supabase Storage）／Canva 設計連結
 - `core/api.js` 新增 storage 輔助函式：`uploadStorageFile`、`getSignedUrl`、`deleteStorageFile`、`storageSafeFileName`
@@ -62,9 +72,10 @@
 8. `schema_v8_tasks_budget.sql`：`marketing_campaigns` 新增 `midea_budget_code`／`payment_status`／`claim_status`／`flight_cost`；新表 `marketing_campaign_tasks`（任務/里程碑）、`marketing_campaign_budget_items`（預算明細）— **已執行成功**
 9. `schema_v9_documents.sql`：新表 `marketing_campaign_documents` + `campaign-documents` storage bucket，用於行銷案詳情頁文件附件（報價單、攤位設計圖、大會文件、廠商資料）。2026-07-10 已在正式 Supabase project 驗證可用。
 10. `schema_v10_risks.sql`：新表 `marketing_campaign_risks`，用於正式追蹤行銷案風險與待決事項（預算、時程、廠商、原廠、素材、業務配合、補助請款等）。2026-07-10 已在正式 Supabase project 驗證可用（REST smoke test 建立/讀取/刪除成功）。
-11. `schema_v11_risk_updates.sql`：新表 `marketing_campaign_risk_updates`，用於記錄待決事項的每次追蹤更新、下次追蹤日與重要標記。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
+11. `schema_v11_risk_updates.sql`：新表 `marketing_campaign_risk_updates`，用於記錄待決事項的每次追蹤更新、下次追蹤日與重要標記。2026-07-11 已由使用者在正式 Supabase project 執行完成。
+12. `schema_v12_performance_resources.sql`：新表 `marketing_campaign_performance`（行銷案成效）與 `marketing_resources`（行銷資源庫）。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
 
-⚠️ v1~v10 全部已在正式 Supabase project 執行過並驗證成功；v11 尚待執行。
+⚠️ v1~v11 已在正式 Supabase project 執行；v12 尚待執行。
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
@@ -84,7 +95,8 @@
 - [x] 套用 `schema_v9_documents.sql` 到正式 Supabase project，啟用行銷案文件附件資料表與 storage bucket
 - [x] 執行 `scripts/seed-exhibition-oct2026.mjs --apply`，把「10月空調展」預算、任務、廠商、附件寫入既有行銷案
 - [x] 套用 `schema_v10_risks.sql` 到正式 Supabase project，啟用風險與待決事項正式資料表
-- [ ] 套用 `schema_v11_risk_updates.sql` 到正式 Supabase project，啟用待決事項追蹤紀錄資料表，並用 REST smoke test 建立/讀取/刪除驗證
+- [x] 套用 `schema_v11_risk_updates.sql` 到正式 Supabase project，啟用待決事項追蹤紀錄資料表
+- [ ] 套用 `schema_v12_performance_resources.sql` 到正式 Supabase project，啟用行銷成效與行銷資源庫資料表，並用 REST smoke test 建立/讀取/刪除驗證
 
 ## 未解決問題
 - Supabase MCP 仍對 project `apgrclmrkarxlajmhnpa` 無操作權限；若未來需要資料庫操作，可使用 authenticated 帳密或 service role key 走本機腳本。
