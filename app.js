@@ -475,26 +475,23 @@ function ymdCompact(s){
 
 function googleCalendarTaskUrl(task){
   const c = detailCampaignCache;
-  const start = task.planned_start || task.planned_end;
-  if (!start) return '';
-  const endDate = task.planned_end || task.planned_start || start;
-  const startText = ymdCompact(start);
-  const end = new Date(`${endDate}T00:00:00`);
-  end.setDate(end.getDate() + 1);
-  const endText = end.toISOString().slice(0, 10).replaceAll('-', '');
+  if (!task.planned_end) return '';
+  const day = ymdCompact(task.planned_end);
   const details = [
     `專案：${c?.name || ''}`,
     `任務：${task.task_name}`,
     `負責人：${task.owner || '-'}`,
     `狀態：${task.status || '-'}`,
     `完成率：${Math.round(Number(task.completion_pct) || 0)}%`,
+    `預計完成：${fdFull(task.planned_end)}`,
     task.expected_output ? `預期成果：${task.expected_output}` : '',
     task.notes ? `備註：${task.notes}` : ''
   ].filter(Boolean).join('\n');
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: `[美昇行銷] ${c?.name || ''}｜${task.task_name}`,
-    dates: `${startText}/${endText}`,
+    dates: `${day}T020000Z/${day}T030000Z`,
+    ctz: 'Asia/Taipei',
     details
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
