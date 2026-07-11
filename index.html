@@ -53,8 +53,8 @@ h1,h2,.display{font-family:'Big Shoulders Display',sans-serif;font-weight:700;le
 /* ── Shell ── */
 #sidebar{width:220px;background:var(--ink);color:#fff;display:none;flex-direction:column;position:fixed;height:100vh;z-index:100}
 #main{margin-left:220px;flex:1;padding:30px 34px;min-height:100vh;display:none}
-.logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:flex-start;gap:8px}
-.brand-logo-sb{height:32px;width:auto;filter:brightness(0) invert(1)}
+.logo{padding:24px 20px 18px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.brand-logo-sb{height:48px;width:auto;filter:brightness(0) invert(1)}
 .logo small{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#8496a0;text-transform:uppercase}
 nav{flex:1;padding:14px 0}
 .ni{display:flex;align-items:center;gap:10px;padding:12px 20px;color:#9FB1AC;font-size:15px;cursor:pointer;border-left:3px solid transparent;font-weight:500}
@@ -234,7 +234,8 @@ tbody tr:last-child td{border-bottom:none}
 @media (max-width: 760px){
   body{display:block;font-size:16px}
   #sidebar{position:static;width:100%;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:4px 0}
-  .logo{border-bottom:none;padding:12px 14px}
+  .logo{border-bottom:none;padding:10px 14px}
+  .brand-logo-sb{height:38px}
   .logo small{display:none}
   nav{display:flex;flex:1 1 auto;min-width:0;padding:0 8px 10px;overflow-x:auto}
   .ni{border-left:none;border-bottom:3px solid transparent;padding:10px 12px;white-space:nowrap}
