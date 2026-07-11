@@ -11,6 +11,7 @@
 - 登入測試帳號：test@mcttw.com.tw
 - Cloudflare Pages 環境變數：`RSS2JSON_API_KEY`（新聞蒐集用）
 - GitHub Secrets（供每週自動文案排程用）：`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`RSS2JSON_API_KEY`、`ANTHROPIC_API_KEY`
+- 新增使用者預設密碼：`123456`；v13 起新使用者首次登入會被要求變更密碼。
 
 ## 功能總覽（截至本次）
 
@@ -58,6 +59,11 @@
 - 成功案例列表與編輯視窗已支援登入後下載封面圖片，讓業務可自行查詢並下載案例素材。
 - `core/api.js` 新增 storage 輔助函式：`uploadStorageFile`、`getSignedUrl`、`deleteStorageFile`、`storageSafeFileName`
 
+### 7. 帳號與密碼
+- 登入頁新增「忘記密碼」，使用 Supabase Auth recovery email 流程，使用者可自行設定新密碼。
+- `app_user_access` 權限表記錄允許登入名單、是否啟用、是否必須首次登入改密碼。前端登入後會查此表；若 `must_change_password = true`，會先要求設定新密碼，完成後才進平台。
+- 2026-07-11 嘗試用 Supabase public signup API 建立使用者，因 email rate limit 僅成功建立 `kevin@mcttw.com.tw`、`lungbin5412@mcttw.com.tw`、`eric@mcttw.com.tw`；`c1994915@mcttw.com.tw`、`vincent@mcttw.com.tw`、`hill22518@mcttw.com.tw`、`info@mcttw.com.tw`、`hansLee0408@mcttw.com.tw` 仍需稍後重試或在 Supabase Dashboard → Authentication → Users 手動建立，預設密碼均為 `123456`。
+
 ## 視覺設計
 - 全站重新設計過，脫離制式 AI 儀表板樣板：Big Shoulders Display（工業感標題字體）+ IBM Plex Sans/Mono（內文/數據），冷媒藍綠＋黃銅＋鋼藍的工程儀表色系，取代預設 blue/navy SaaS 樣板
 - 官方 logo（`assets/logo.png`）用於登入頁（原色）與側邊欄（filter 反白）
@@ -76,8 +82,9 @@
 10. `schema_v10_risks.sql`：新表 `marketing_campaign_risks`，用於正式追蹤行銷案風險與待決事項（預算、時程、廠商、原廠、素材、業務配合、補助請款等）。2026-07-10 已在正式 Supabase project 驗證可用（REST smoke test 建立/讀取/刪除成功）。
 11. `schema_v11_risk_updates.sql`：新表 `marketing_campaign_risk_updates`，用於記錄待決事項的每次追蹤更新、下次追蹤日與重要標記。2026-07-11 已由使用者在正式 Supabase project 執行完成。
 12. `schema_v12_performance_resources.sql`：新表 `marketing_campaign_performance`（行銷案成效）與 `marketing_resources`（行銷資源庫）。2026-07-11 已在正式 Supabase project 驗證可用（REST smoke test 建立/讀取/刪除成功）。
+13. `schema_v13_user_access.sql`：新表 `app_user_access`，用於平台允許登入名單與首次登入強制改密碼旗標。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
 
-⚠️ v1~v12 已在正式 Supabase project 執行。
+⚠️ v1~v12 已在正式 Supabase project 執行；v13 尚待執行。
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
@@ -99,6 +106,8 @@
 - [x] 套用 `schema_v10_risks.sql` 到正式 Supabase project，啟用風險與待決事項正式資料表
 - [x] 套用 `schema_v11_risk_updates.sql` 到正式 Supabase project，啟用待決事項追蹤紀錄資料表
 - [x] 套用 `schema_v12_performance_resources.sql` 到正式 Supabase project，啟用行銷成效與行銷資源庫資料表，並用 REST smoke test 建立/讀取/刪除驗證
+- [ ] 套用 `schema_v13_user_access.sql` 到正式 Supabase project，啟用平台權限名單與首次登入強制改密碼
+- [ ] 完成剩餘 5 位 Auth 使用者建立：`c1994915@mcttw.com.tw`、`vincent@mcttw.com.tw`、`hill22518@mcttw.com.tw`、`info@mcttw.com.tw`、`hansLee0408@mcttw.com.tw`
 
 ## 未解決問題
 - Supabase MCP 仍對 project `apgrclmrkarxlajmhnpa` 無操作權限；若未來需要資料庫操作，可使用 authenticated 帳密或 service role key 走本機腳本。

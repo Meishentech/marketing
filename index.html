@@ -49,6 +49,11 @@ h1,h2,.display{font-family:'Big Shoulders Display',sans-serif;font-weight:700;le
 .login-btn:hover{background:var(--teal-deep)}
 .login-btn:disabled{opacity:.5;cursor:not-allowed}
 .login-err{font-size:13px;color:var(--rust);margin-top:10px;text-align:center;min-height:18px}
+.login-link{display:block;width:100%;background:none;border:none;color:var(--teal);font-size:13px;margin-top:14px;text-align:center}
+.login-link:hover{text-decoration:underline}
+.login-note{font-size:13px;color:var(--muted);line-height:1.5;margin-top:12px;text-align:center}
+#password-screen{display:none;position:fixed;inset:0;background:linear-gradient(0deg, rgba(18,33,43,.94), rgba(18,33,43,.94));z-index:10000;align-items:center;justify-content:center}
+#password-screen.open{display:flex}
 
 /* ── Shell ── */
 #sidebar{width:220px;background:var(--ink);color:#fff;display:none;flex-direction:column;position:fixed;height:100vh;z-index:100}
@@ -275,7 +280,31 @@ tbody tr:last-child td{border-bottom:none}
       <label>密碼</label>
       <input id="li-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="login-btn" id="li-btn" onclick="doLogin()">登入</button>
+      <button class="login-link" onclick="sendPasswordReset()">忘記密碼？</button>
+      <div class="login-note" id="li-note"></div>
       <div class="login-err" id="li-err"></div>
+    </div>
+  </div>
+</div>
+
+<div id="password-screen">
+  <div class="login-box">
+    <div class="login-inner">
+      <div class="login-mark">
+        <img src="assets/logo.png" alt="美昇" class="brand-logo">
+        <div>
+          <div class="login-title" id="pw-title">變更密碼</div>
+          <div class="login-sub" id="pw-sub">First Login Required</div>
+        </div>
+      </div>
+      <div class="login-note" id="pw-note">請設定自己的新密碼後再進入平台。</div>
+      <label>新密碼</label>
+      <input id="pw-new" type="password" placeholder="至少 8 碼">
+      <label>再次輸入新密碼</label>
+      <input id="pw-confirm" type="password" placeholder="再次輸入新密碼" onkeydown="if(event.key==='Enter')changeOwnPassword()">
+      <button class="login-btn" id="pw-btn" onclick="changeOwnPassword()">儲存新密碼</button>
+      <button class="login-link" onclick="doLogout(false)">取消並登出</button>
+      <div class="login-err" id="pw-err"></div>
     </div>
   </div>
 </div>
@@ -629,7 +658,10 @@ tbody tr:last-child td{border-bottom:none}
 <script src="app.js"></script>
 <script>
 (async function init(){
-  if (await checkAuth()) { await showApp(); await nav('dashboard'); }
+  if (await handleAuthRedirect()) return;
+  if (await checkAuth()) {
+    await completeLogin(sessionStorage.getItem('ms_email') || '', 'dashboard');
+  }
 })();
 </script>
 </body>
