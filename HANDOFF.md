@@ -89,9 +89,9 @@
 11. `schema_v11_risk_updates.sql`：新表 `marketing_campaign_risk_updates`，用於記錄待決事項的每次追蹤更新、下次追蹤日與重要標記。2026-07-11 已由使用者在正式 Supabase project 執行完成。
 12. `schema_v12_performance_resources.sql`：新表 `marketing_campaign_performance`（行銷案成效）與 `marketing_resources`（行銷資源庫）。2026-07-11 已在正式 Supabase project 驗證可用（REST smoke test 建立/讀取/刪除成功）。
 13. `schema_v13_user_access.sql`：新表 `app_user_access`，用於平台允許登入名單與首次登入強制改密碼旗標。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
-14. `schema_v14_resource_files.sql`：`marketing_resources` 新增 `file_path`／`file_name`／`file_size`，並建立 private Storage bucket `marketing-resource-files`，用於行銷資源庫檔案上傳/下載。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
+14. `schema_v14_resource_files.sql`：`marketing_resources` 新增 `file_path`／`file_name`／`file_size`，並建立 private Storage bucket `marketing-resource-files`，用於行銷資源庫檔案上傳/下載。2026-07-11 已在正式 Supabase project 驗證可用（Storage 上傳/簽名下載/刪除 + REST 建立/讀取/刪除成功）。
 
-⚠️ v1~v12 已在正式 Supabase project 執行；v13、v14 尚待執行。
+⚠️ v1~v12、v14 已在正式 Supabase project 執行；v13 尚待執行。
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
@@ -114,7 +114,7 @@
 - [x] 套用 `schema_v11_risk_updates.sql` 到正式 Supabase project，啟用待決事項追蹤紀錄資料表
 - [x] 套用 `schema_v12_performance_resources.sql` 到正式 Supabase project，啟用行銷成效與行銷資源庫資料表，並用 REST smoke test 建立/讀取/刪除驗證
 - [ ] 套用 `schema_v13_user_access.sql` 到正式 Supabase project，啟用平台權限名單與首次登入強制改密碼
-- [ ] 套用 `schema_v14_resource_files.sql` 到正式 Supabase project，啟用行銷資源庫檔案上傳/下載
+- [x] 套用 `schema_v14_resource_files.sql` 到正式 Supabase project，啟用行銷資源庫檔案上傳/下載
 - [ ] 完成剩餘 5 位 Auth 使用者建立：`c1994915@mcttw.com.tw`、`vincent@mcttw.com.tw`、`hill22518@mcttw.com.tw`、`info@mcttw.com.tw`、`hansLee0408@mcttw.com.tw`
 
 ## 未解決問題
