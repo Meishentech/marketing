@@ -319,6 +319,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="ni" data-view="campaigns" onclick="nav('campaigns')">行銷案管理</div>
     <div class="ni" data-view="performance" onclick="nav('performance')">成效查詢</div>
     <div class="ni" data-view="resources" onclick="nav('resources')">行銷資源庫</div>
+    <div class="ni" data-view="externalResources" onclick="nav('externalResources')">對外素材</div>
     <div class="ni" data-view="news" onclick="nav('news')">新聞蒐集</div>
     <div class="ni" data-view="drafts" onclick="nav('drafts')">每週文案彙整</div>
     <div class="ni" data-view="cases" onclick="nav('cases')">成功案例</div>
@@ -467,6 +468,11 @@ tbody tr:last-child td{border-bottom:none}
         <div class="fg1"><label class="fl">版本</label><input id="res-version" placeholder="例如 v1 2026-07"></div>
         <div class="fg1 ff"><label class="fl">資源連結</label><input id="res-url" placeholder="Google Drive、官網或檔案連結"></div>
         <div class="fg1 ff"><label class="fl">Canva 連結</label><input id="res-canva" placeholder="https://www.canva.com/..."></div>
+        <div class="fg1 ff">
+          <label class="fl">檔案上傳</label>
+          <div id="res-file-current" style="margin-bottom:8px"></div>
+          <input id="res-file" type="file" accept=".pdf,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.csv,image/*,application/pdf" onchange="onResourceFilePick(this)">
+        </div>
         <div class="fg1"><label class="fl">對外使用</label>
           <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);padding-top:9px"><input id="res-external" type="checkbox" style="width:auto"> 業務可直接提供客戶</label>
         </div>

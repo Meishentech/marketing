@@ -51,6 +51,10 @@ let currentCoverPath = null;
 let pendingDocFile = null;
 let currentDocPath = null;
 let currentDocFileName = null;
+let pendingResourceFile = null;
+let currentResourceFilePath = null;
+let currentResourceFileName = null;
+let currentResourceFileSize = null;
 
 // ── NAV ──
 async function nav(view){
@@ -63,6 +67,7 @@ async function nav(view){
   else if (view === 'cases') await renderCasesPage();
   else if (view === 'performance') await renderPerformancePage();
   else if (view === 'resources') await renderResourcesPage();
+  else if (view === 'externalResources') await renderExternalResourcesPage();
 }
 
 function tag(status){
@@ -213,6 +218,8 @@ async function renderDashboard(){
   const dashboardBudgetItems = await GET('marketing_campaign_budget_items?select=id,campaign_id,item_name,budget_nature,amount_twd,quote_status&order=seq.asc') || [];
   const dashboardRisks = await safeGET('marketing_campaign_risks?select=id,campaign_id,risk_type,title,description,impact_level,owner,due_date,status,show_on_dashboard,resolution_note&order=due_date.asc,created_at.desc');
   const dashboardRiskUpdates = await safeGET('marketing_campaign_risk_updates?select=id,risk_id,update_note,updated_by,update_date,next_followup_date,is_important,created_at&order=update_date.desc,created_at.desc');
+  const dashboardPerformance = await safeGET('marketing_campaign_performance?order=updated_at.desc');
+  const dashboardResources = await safeGET('marketing_resources?is_external_usable=eq.true&order=updated_at.desc');
   RISKS = dashboardRisks;
   RISK_UPDATES = dashboardRiskUpdates;
   const total = CAMPAIGNS.length;
@@ -334,59 +341,51 @@ async function renderDashboard(){
       <div class="kpi-bar"><i style="width:${pct}%;background:var(--teal)"></i></div>
     </div>`;
   }).join('') || '<div class="empty">尚無預算分類資料</div>';
+  const activeProjectRows = CAMPAIGNS
+    .filter(c => ['進行中', '估價中', '預計規劃', '補助申請'].includes(c.status))
+    .slice(0, 7)
+    .map(c => `<div class="dash-item" onclick="campaignDetail('${c.id}')">
+      <div><div class="dash-item-title">${esc(c.name)}</div><div class="dash-item-sub">預算 NT$ ${fmt(c.budget)} · ${esc(c.owner || '未指定負責人')}</div></div>
+      ${tag(c.status)}
+    </div>`).join('') || '<div class="empty">目前沒有進行中專案</div>';
+  const pendingRows = followupItems.slice(0, 7).map(({ c, r, latest, meta }) => `
+    <div class="dash-item" onclick="campaignDetail('${c.id}')">
+      <div><div class="dash-item-title">${esc(r.title)}</div><div class="dash-item-sub">${esc(c.name)} · ${esc(meta.label)}${latest?.update_note ? ' · ' + esc(latest.update_note).slice(0, 28) : ''}</div></div>
+      ${riskImpactTag(r.impact_level)}
+    </div>`).join('') || decisionRows || '<div class="empty">目前沒有待決事項</div>';
+  const performanceRows = dashboardPerformance.slice(0, 7).map(p => {
+    const c = campaignById[p.campaign_id];
+    return `<div class="dash-item" onclick="nav('performance')">
+      <div><div class="dash-item-title">${esc(c?.name || '未連結專案')}</div><div class="dash-item-sub">名單 ${fmt(p.lead_count)} · 有效商機 ${fmt(p.qualified_lead_count)} · 成交 NT$ ${fmt(p.deal_amount)}</div></div>
+      <span class="case-tag">成效</span>
+    </div>`;
+  }).join('') || '<div class="empty">尚無近期成效資料</div>';
+  const resourceRows = dashboardResources.slice(0, 7).map(r => `
+    <div class="dash-item" onclick="nav('externalResources')">
+      <div><div class="dash-item-title">${esc(r.title)}</div><div class="dash-item-sub">${esc(r.resource_type)} · ${esc(r.product_line || r.audience || '可對外使用')}${r.file_path ? ' · 可下載' : ''}</div></div>
+      <span class="case-tag">${esc(r.resource_type)}</span>
+    </div>`).join('') || '<div class="empty">尚無可對外使用素材</div>';
 
   document.getElementById('vc').innerHTML = `
-    <div class="ph"><div><div class="pt">經營總覽</div><div class="ps">${new Date().getFullYear()} 年度行銷投資、風險與近期活動</div></div>
+    <div class="ph"><div><div class="pt">經營總覽</div><div class="ps">進行中專案、待決事項、近期成效與可用素材</div></div>
       <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button></div>
-    <div class="kpi-strip">
-      <div class="kpi-seg"><div class="kpi-label">全部行銷案</div><div class="kpi-val mono">${total}</div></div>
-      ${statusCounts.map(({ status, count }) => `
-        <div class="kpi-seg"><div class="kpi-label">${esc(status)}</div><div class="kpi-val mono" style="color:${STATUS_HEX[status]}">${count}</div></div>`).join('')}
-    </div>
     <div class="dash-kpi-grid">
-      <div class="stat-box"><div class="kpi-label">年度總預算</div><div class="stat-num">NT$ ${fmt(totalBudget)}</div></div>
-      <div class="stat-box">
-        <div class="kpi-label">預算執行率</div>
-        <div class="stat-num">${execRate}<span style="font-size:16px">%</span> <span style="font-size:13px;color:var(--muted);font-family:'IBM Plex Sans';font-weight:500">NT$ ${fmt(totalSpend)} 已花費</span></div>
-        <div class="kpi-bar"><i style="width:${Math.min(100, execRate)}%;background:var(--teal)"></i></div>
-      </div>
-      <div class="stat-box"><div class="kpi-label">剩餘可用預算</div><div class="stat-num">NT$ ${fmt(remainingBudget)}</div></div>
-      <div class="stat-box">
-        <div class="kpi-label">美的補助核發率</div>
-        <div class="stat-num">${subsidyRate}<span style="font-size:16px">%</span> <span style="font-size:13px;color:var(--muted);font-family:'IBM Plex Sans';font-weight:500">NT$ ${fmt(subsidyReceived)} / ${fmt(subsidyPlanned)}</span></div>
-        <div class="kpi-bar"><i style="width:${Math.min(100, subsidyRate)}%;background:var(--steel)"></i></div>
-      </div>
-    </div>
-    <div class="card dash-panel" style="margin-bottom:16px">
-      <div class="dash-panel-head"><div><div class="kpi-label">追蹤節奏</div><div class="dash-panel-title">今日待辦與逾期追蹤</div></div></div>
-      <div class="follow-grid">
-        <div class="follow-stat"><div class="num mono">${todayFollowups}</div><div class="label">今日需追蹤</div></div>
-        <div class="follow-stat"><div class="num mono">${overdueFollowups}</div><div class="label">逾期／尚無更新</div></div>
-        <div class="follow-stat"><div class="num mono">${highOpenRisks}</div><div class="label">高影響未解決</div></div>
-      </div>
-      <div class="follow-list">${followupRows}</div>
-    </div>
-    <div class="dash-grid">
       <div class="card dash-panel">
-        <div class="dash-panel-head"><div><div class="kpi-label">未來 30 天</div><div class="dash-panel-title">重點活動與任務</div></div></div>
-        <div class="dash-list">${upcomingRows}</div>
+        <div class="dash-panel-head"><div><div class="kpi-label">進行中專案</div><div class="dash-panel-title">${CAMPAIGNS.filter(c => c.status !== '結案').length} 個未結案</div></div><button class="btn btn-outline btn-sm" onclick="nav('campaigns')">查看</button></div>
+        <div class="dash-list">${activeProjectRows}</div>
       </div>
       <div class="card dash-panel">
-        <div class="dash-panel-head"><div><div class="kpi-label">管理追蹤</div><div class="dash-panel-title">待決策事項</div></div></div>
-        <div class="dash-list">${decisionRows}</div>
+        <div class="dash-panel-head"><div><div class="kpi-label">待決事項</div><div class="dash-panel-title">${followupItems.length} 個需追蹤</div></div><span class="case-tag">${todayFollowups} 今日</span></div>
+        <div class="dash-list">${pendingRows}</div>
       </div>
       <div class="card dash-panel">
-        <div class="dash-panel-head"><div><div class="kpi-label">管理風險</div><div class="dash-panel-title">高風險專案</div></div></div>
-        <div class="dash-list">${riskRows}</div>
+        <div class="dash-panel-head"><div><div class="kpi-label">近期成效</div><div class="dash-panel-title">${dashboardPerformance.length} 筆成效紀錄</div></div><button class="btn btn-outline btn-sm" onclick="nav('performance')">查看</button></div>
+        <div class="dash-list">${performanceRows}</div>
       </div>
       <div class="card dash-panel">
-        <div class="dash-panel-head"><div><div class="kpi-label">資源配置</div><div class="dash-panel-title">預算分類</div></div></div>
-        <div class="dash-mix">${categoryRows}</div>
+        <div class="dash-panel-head"><div><div class="kpi-label">可用素材更新</div><div class="dash-panel-title">${dashboardResources.length} 個可對外素材</div></div><button class="btn btn-outline btn-sm" onclick="nav('externalResources')">查看</button></div>
+        <div class="dash-list">${resourceRows}</div>
       </div>
-    </div>
-    <div style="margin-top:16px">
-      <div class="kpi-label" style="margin-bottom:8px">重點專案 Top 5</div>
-      <div class="rowlist">${focusRows}</div>
     </div>`;
 }
 
@@ -1237,6 +1236,21 @@ async function delPerformance(){
 }
 
 // ── RESOURCES ──
+function fmtFileSize(bytes){
+  const n = Number(bytes) || 0;
+  if (!n) return '';
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function resourceFileAction(r){
+  const fileBtn = r.file_path
+    ? `<button class="btn btn-outline btn-sm" data-path="${esc(r.file_path)}" data-name="${esc(r.file_name || r.title)}" onclick="event.stopPropagation();downloadResourceFileFromButton(this)">下載檔案</button>`
+    : '';
+  const link = r.resource_url ? `<a href="${esc(r.resource_url)}" target="_blank" rel="noopener">外部連結</a>` : '';
+  return [fileBtn, link].filter(Boolean).join(' ');
+}
+
 async function renderResourcesPage(load = true){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
   if (load) RESOURCES = await safeGET('marketing_resources?order=updated_at.desc');
@@ -1254,7 +1268,7 @@ async function renderResourcesPage(load = true){
       <td>${esc(r.audience || '-')}</td>
       <td>${esc(r.version || '-')}</td>
       <td>${r.is_external_usable ? '<span class="tag tag-teal">可對外</span>' : '<span class="tag tag-muted">內部</span>'}</td>
-      <td onclick="event.stopPropagation()">${r.resource_url ? `<a href="${esc(r.resource_url)}" target="_blank" rel="noopener">開啟</a>` : '-'}</td>
+      <td onclick="event.stopPropagation()">${resourceFileAction(r) || '-'}</td>
     </tr>`).join('');
   document.getElementById('vc').innerHTML = `
     <div class="ph"><div><div class="pt">行銷資源庫</div><div class="ps">集中查詢簡報、DM、型錄、技術文章與可對外素材</div></div>
@@ -1290,7 +1304,7 @@ async function renderResourcesPage(load = true){
     </div>
     <div class="tw">
       <table>
-        <thead><tr><th>類型</th><th>資源名稱</th><th>對象</th><th>版本</th><th>權限</th><th>連結</th></tr></thead>
+        <thead><tr><th>類型</th><th>資源名稱</th><th>對象</th><th>版本</th><th>權限</th><th>檔案／連結</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       ${rows ? '' : `<div class="empty">${RESOURCES.length ? '沒有符合條件的資源，請調整篩選條件' : '尚無行銷資源，點擊「＋ 新增資源」開始建立'}</div>`}
@@ -1313,6 +1327,7 @@ function filterAndSortResources(list){
       r.version,
       r.resource_url,
       r.canva_url,
+      r.file_name,
       ...(r.tags || []),
       r.notes
     ].filter(Boolean).join(' ').toLowerCase();
@@ -1344,6 +1359,35 @@ function resetResourceFilters(){
   renderResourcesPage(false);
 }
 
+async function renderExternalResourcesPage(){
+  document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
+  RESOURCES = await safeGET('marketing_resources?is_external_usable=eq.true&order=updated_at.desc');
+  const rows = RESOURCES.map(r => `
+    <tr onclick="openResourceModal('${r.id}')">
+      <td><span class="case-tag">${esc(r.resource_type)}</span></td>
+      <td class="tb-name">${esc(r.title)}${r.product_line ? `<div class="muted-text">${esc(r.product_line)}</div>` : ''}</td>
+      <td>${esc(r.audience || '-')}</td>
+      <td>${esc(r.version || '-')}</td>
+      <td onclick="event.stopPropagation()">${resourceFileAction(r) || '-'}</td>
+    </tr>`).join('');
+  document.getElementById('vc').innerHTML = `
+    <div class="ph"><div><div class="pt">對外素材</div><div class="ps">只顯示業務可提供客戶的行銷資源</div></div>
+      <button class="btn btn-outline" onclick="nav('resources')">管理全部資源</button></div>
+    <div class="dash-kpi-grid">
+      <div class="stat-box"><div class="kpi-label">可用素材</div><div class="stat-num mono">${RESOURCES.length}</div></div>
+      <div class="stat-box"><div class="kpi-label">有檔案可下載</div><div class="stat-num mono">${RESOURCES.filter(r => r.file_path).length}</div></div>
+      <div class="stat-box"><div class="kpi-label">簡報/DM/型錄</div><div class="stat-num mono">${RESOURCES.filter(r => ['簡報','DM','型錄'].includes(r.resource_type)).length}</div></div>
+      <div class="stat-box"><div class="kpi-label">最近更新</div><div class="stat-num" style="font-size:22px">${fdFull(RESOURCES[0]?.updated_at?.slice(0, 10) || '')}</div></div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>類型</th><th>資源名稱</th><th>對象</th><th>版本</th><th>檔案／連結</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${rows ? '' : '<div class="empty">目前沒有標記為可對外使用的素材</div>'}
+    </div>`;
+}
+
 function openResourceModal(id){
   editResourceId = id || null;
   const r = id ? RESOURCES.find(x => x.id === id) : null;
@@ -1358,13 +1402,59 @@ function openResourceModal(id){
   document.getElementById('res-external').checked = r?.is_external_usable || false;
   document.getElementById('res-tags').value = (r?.tags || []).join('、');
   document.getElementById('res-notes').value = r?.notes || '';
+  document.getElementById('res-file').value = '';
+  pendingResourceFile = null;
+  currentResourceFilePath = r?.file_path || null;
+  currentResourceFileName = r?.file_name || null;
+  currentResourceFileSize = r?.file_size || null;
+  renderResourceFileCurrent();
   document.getElementById('res-delete').style.display = id ? '' : 'none';
   openM('mresource');
+}
+
+function renderResourceFileCurrent(){
+  const el = document.getElementById('res-file-current');
+  if (pendingResourceFile) {
+    el.innerHTML = `<span class="muted-text">待上傳：${esc(pendingResourceFile.name)} ${fmtFileSize(pendingResourceFile.size)}</span>`;
+    return;
+  }
+  if (currentResourceFilePath) {
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="muted-text">${esc(currentResourceFileName || currentResourceFilePath)} ${fmtFileSize(currentResourceFileSize)}</span>
+      <button class="btn btn-outline btn-sm" data-path="${esc(currentResourceFilePath)}" data-name="${esc(currentResourceFileName || '')}" onclick="downloadResourceFileFromButton(this)">下載</button>
+    </div>`;
+    return;
+  }
+  el.innerHTML = '<span class="muted-text">尚未上傳檔案</span>';
+}
+
+function onResourceFilePick(input){
+  pendingResourceFile = input.files[0] || null;
+  renderResourceFileCurrent();
+}
+
+async function downloadResourceFileFromButton(btn){
+  await downloadStorageFile('marketing-resource-files', btn.dataset.path, btn.dataset.name);
 }
 
 async function saveResource(){
   const title = document.getElementById('res-name').value.trim();
   if (!title) { alert('請輸入資源名稱'); return; }
+  let filePath = currentResourceFilePath;
+  let fileName = currentResourceFileName;
+  let fileSize = currentResourceFileSize;
+  if (pendingResourceFile) {
+    try {
+      const oldPath = currentResourceFilePath;
+      filePath = await uploadStorageFile('marketing-resource-files', pendingResourceFile);
+      fileName = pendingResourceFile.name;
+      fileSize = pendingResourceFile.size;
+      if (oldPath && oldPath !== filePath) await deleteStorageFile('marketing-resource-files', oldPath);
+    } catch (e) {
+      alert('檔案上傳失敗，請確認 schema_v14_resource_files.sql 已執行，且檔案小於 50MB。');
+      return;
+    }
+  }
   const payload = {
     title,
     resource_type: document.getElementById('res-type').value,
@@ -1378,6 +1468,11 @@ async function saveResource(){
     notes: document.getElementById('res-notes').value.trim() || null,
     updated_at: new Date().toISOString()
   };
+  if (filePath || fileName || fileSize) {
+    payload.file_path = filePath;
+    payload.file_name = fileName;
+    payload.file_size = fileSize;
+  }
   try {
     if (editResourceId) await PATCH(`marketing_resources?id=eq.${editResourceId}`, payload);
     else await POST('marketing_resources', payload);
@@ -1392,6 +1487,7 @@ async function saveResource(){
 async function delResource(){
   if (!editResourceId) return;
   if (!confirm('確定刪除此行銷資源？')) return;
+  if (currentResourceFilePath) await deleteStorageFile('marketing-resource-files', currentResourceFilePath);
   await DEL(`marketing_resources?id=eq.${editResourceId}`);
   closeM('mresource');
   await renderResourcesPage();
@@ -1770,6 +1866,26 @@ async function downloadCaseImage(path, title){
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = safeDownloadName(title, ext);
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  } catch (e) {
+    window.open(url, '_blank', 'noopener');
+  }
+}
+
+async function downloadStorageFile(bucket, path, fileName){
+  if (!path) return;
+  const url = await getSignedUrl(bucket, path, 300);
+  if (!url) { alert('檔案下載連結產生失敗，請重新登入後再試。'); return; }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(await res.text());
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName || path.split('/').pop() || 'download';
     document.body.appendChild(a);
     a.click();
     URL.revokeObjectURL(a.href);
