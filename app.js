@@ -10,12 +10,16 @@ const safeDownloadName = (name, ext = 'png') => `${(name || 'download').replace(
 const STATUS_ORDER = ['預計規劃', '估價中', '進行中', '補助申請', '結案'];
 const STATUS_HEX   = { '預計規劃': '#7C8B94', '估價中': '#B97A3D', '進行中': '#0E7C86', '補助申請': '#5B7FA6', '結案': '#0B4F55' };
 const STATUS_CLASS = { '預計規劃': 'plan',    '估價中': 'brass',   '進行中': 'teal',    '補助申請': 'grant',   '結案': 'deep' };
+const PRIORITY_ORDER = ['高', '中', '低'];
+const PRIORITY_CLASS = { '高': 'pri-high', '中': 'pri-mid', '低': 'pri-low' };
 const RESOURCE_TYPES = ['簡報', 'DM', '型錄', '技術文章', '期刊投稿', '展場素材', '社群文案', '圖片影片', '案例', '其他'];
 
 function sortByStatus(list){
   return [...list].sort((a, b) => {
     const d = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
-    return d !== 0 ? d : new Date(b.created_at) - new Date(a.created_at);
+    if (d !== 0) return d;
+    const p = PRIORITY_ORDER.indexOf(a.priority || '中') - PRIORITY_ORDER.indexOf(b.priority || '中');
+    return p !== 0 ? p : new Date(b.created_at) - new Date(a.created_at);
   });
 }
 
@@ -73,6 +77,12 @@ async function nav(view){
 function tag(status){
   const cls = STATUS_CLASS[status] || 'muted';
   return `<span class="tag tag-${cls}">${esc(status)}</span>`;
+}
+
+function priorityTag(priority){
+  const v = priority || '中';
+  const cls = PRIORITY_CLASS[v] || 'pri-mid';
+  return `<span class="tag tag-${cls}">${esc(v)}</span>`;
 }
 
 async function safeGET(path){
@@ -404,6 +414,7 @@ function _renderCampaignsBody(){
     <tr onclick="campaignDetail('${c.id}')">
       <td class="tb-name">${esc(c.name)}</td>
       <td>${tag(c.status)}</td>
+      <td>${priorityTag(c.priority)}</td>
       <td class="mono tb-amt">NT$ ${fmt(c.budget)}</td>
     </tr>`).join('');
 
@@ -418,7 +429,7 @@ function _renderCampaignsBody(){
     </div>
     <div id="campaign-list" style="${isGantt ? 'display:none' : ''}" class="tw">
       <table>
-        <thead><tr><th>專案名稱</th><th>執行狀態</th><th>預算</th></tr></thead>
+        <thead><tr><th>專案名稱</th><th>執行狀態</th><th>重要性</th><th>預算</th></tr></thead>
         <tbody>${rows || ''}</tbody>
       </table>
       ${rows ? '' : '<div class="empty">尚無行銷案</div>'}
@@ -723,7 +734,7 @@ async function campaignDetail(id){
       <div>
         <button class="btn btn-outline btn-sm" onclick="nav('campaigns')" style="margin-bottom:12px">← 返回總表</button>
         <div class="pt">${esc(c.name)}</div>
-        <div class="ps" style="display:flex;align-items:center;gap:10px;margin-top:8px">${tag(c.status)}</div>
+        <div class="ps" style="display:flex;align-items:center;gap:10px;margin-top:8px">${tag(c.status)}${priorityTag(c.priority)}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-outline" onclick="openWeeklyReport()">產生週報</button>
@@ -1530,6 +1541,7 @@ function openCampaignModal(id){
   document.getElementById('cm-flight').value = c?.flight_cost ?? '';
   document.getElementById('cm-purpose').value = c?.purpose || '';
   document.getElementById('cm-status').value = c?.status || '預計規劃';
+  document.getElementById('cm-priority').value = c?.priority || '中';
   document.getElementById('cm-owner').value = c?.owner || '';
   vendorRows = Array.isArray(c?.vendors) ? [...c.vendors] : [];
   renderVendorRows();
@@ -1570,6 +1582,7 @@ async function saveCampaign(){
     flight_cost: document.getElementById('cm-flight').value || null,
     purpose: document.getElementById('cm-purpose').value.trim() || null,
     status: document.getElementById('cm-status').value,
+    priority: document.getElementById('cm-priority').value,
     vendors: vendorRows.map(v => v.trim()).filter(Boolean),
     owner: document.getElementById('cm-owner').value.trim() || null,
     owner_unit: ownerUnit || null,
@@ -1604,8 +1617,8 @@ function csvCell(v){
 }
 
 function exportCampaignsCSV(){
-  const headers = ['專案名稱', '執行狀態', '預算', '實際花費', '美的預計補助', '美的已核發補助', '美的預算編號', '付款狀態', '請款狀態', '機票費用', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
-  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.budget, c.actual_spend, c.subsidy_planned, c.subsidy_received, c.midea_budget_code, c.payment_status, c.claim_status, c.flight_cost, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
+  const headers = ['專案名稱', '執行狀態', '重要性', '預算', '實際花費', '美的預計補助', '美的已核發補助', '美的預算編號', '付款狀態', '請款狀態', '機票費用', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
+  const rows = CAMPAIGNS.map(c => [c.name, c.status, c.priority, c.budget, c.actual_spend, c.subsidy_planned, c.subsidy_received, c.midea_budget_code, c.payment_status, c.claim_status, c.flight_cost, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
   const csv = [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

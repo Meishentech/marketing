@@ -146,6 +146,9 @@ nav{flex:1;padding:14px 0}
 .tag-grant{color:var(--steel)}.tag-grant::before{background:var(--steel)}
 .tag-deep{color:var(--teal-deep)}.tag-deep::before{background:var(--teal-deep)}
 .tag-muted{color:var(--muted)}.tag-muted::before{background:var(--muted)}
+.tag-pri-high{color:var(--rust)}.tag-pri-high::before{background:var(--rust)}
+.tag-pri-mid{color:var(--brass)}.tag-pri-mid::before{background:var(--brass)}
+.tag-pri-low{color:var(--slate)}.tag-pri-low::before{background:var(--slate)}
 
 /* 成功案例 grid */
 .case-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
@@ -340,7 +343,9 @@ tbody tr:last-child td{border-bottom:none}
         <div class="fg1"><label class="fl">進度</label>
           <select id="cm-status"><option>預計規劃</option><option>估價中</option><option>進行中</option><option>補助申請</option><option>結案</option></select>
         </div>
-        <div class="fg1"></div>
+        <div class="fg1"><label class="fl">重要性</label>
+          <select id="cm-priority"><option>高</option><option selected>中</option><option>低</option></select>
+        </div>
         <div class="fg1"><label class="fl">專案總預算</label><input id="cm-budget" type="number"></div>
         <div class="fg1"><label class="fl">實際花費</label><input id="cm-actual" type="number"></div>
         <div class="fg1"><label class="fl">美的預計補助</label><input id="cm-subsidy-planned" type="number"></div>
