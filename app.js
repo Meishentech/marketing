@@ -9,6 +9,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 const STATUS_ORDER = ['預計規劃', '估價中', '進行中', '補助申請', '結案'];
 const STATUS_HEX   = { '預計規劃': '#7C8B94', '估價中': '#B97A3D', '進行中': '#0E7C86', '補助申請': '#5B7FA6', '結案': '#0B4F55' };
 const STATUS_CLASS = { '預計規劃': 'plan',    '估價中': 'brass',   '進行中': 'teal',    '補助申請': 'grant',   '結案': 'deep' };
+const RESOURCE_TYPES = ['簡報', 'DM', '型錄', '技術文章', '期刊投稿', '展場素材', '社群文案', '圖片影片', '案例', '其他'];
 
 function sortByStatus(list){
   return [...list].sort((a, b) => {
@@ -28,6 +29,7 @@ let RISKS = [];
 let RISK_UPDATES = [];
 let PERFORMANCE = [];
 let RESOURCES = [];
+let RESOURCE_FILTERS = { q: '', type: '', audience: '', external: '', sort: 'updated' };
 let _view = 'dashboard';
 let _campaignView = 'list';
 let editCampaignId = null;
@@ -1234,14 +1236,17 @@ async function delPerformance(){
 }
 
 // ── RESOURCES ──
-async function renderResourcesPage(){
+async function renderResourcesPage(load = true){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
-  RESOURCES = await safeGET('marketing_resources?order=updated_at.desc');
+  if (load) RESOURCES = await safeGET('marketing_resources?order=updated_at.desc');
   const types = Object.entries(RESOURCES.reduce((acc, r) => {
     acc[r.resource_type] = (acc[r.resource_type] || 0) + 1;
     return acc;
   }, {})).sort((a, b) => b[1] - a[1]);
-  const rows = RESOURCES.map(r => `
+  const audiences = [...new Set(RESOURCES.map(r => r.audience).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  const filteredResources = filterAndSortResources(RESOURCES);
+  const hasFilters = Object.entries(RESOURCE_FILTERS).some(([key, value]) => key !== 'sort' && value);
+  const rows = filteredResources.map(r => `
     <tr onclick="openResourceModal('${r.id}')">
       <td><span class="case-tag">${esc(r.resource_type)}</span></td>
       <td class="tb-name">${esc(r.title)}${r.product_line ? `<div class="muted-text">${esc(r.product_line)}</div>` : ''}</td>
@@ -1259,13 +1264,83 @@ async function renderResourcesPage(){
       <div class="stat-box"><div class="kpi-label">最多類型</div><div class="stat-num" style="font-size:24px">${esc(types[0]?.[0] || '-')}</div></div>
       <div class="stat-box"><div class="kpi-label">分類數</div><div class="stat-num mono">${types.length}</div></div>
     </div>
+    <div class="filter-bar">
+      <input id="res-filter-q" value="${esc(RESOURCE_FILTERS.q)}" placeholder="搜尋名稱、產品線、標籤、備註" oninput="setResourceFilter('q', this.value)">
+      <select id="res-filter-type" onchange="setResourceFilter('type', this.value)">
+        <option value="">全部類型</option>
+        ${RESOURCE_TYPES.map(t => `<option value="${esc(t)}" ${RESOURCE_FILTERS.type === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+      </select>
+      <select id="res-filter-audience" onchange="setResourceFilter('audience', this.value)">
+        <option value="">全部對象</option>
+        ${audiences.map(a => `<option value="${esc(a)}" ${RESOURCE_FILTERS.audience === a ? 'selected' : ''}>${esc(a)}</option>`).join('')}
+      </select>
+      <select id="res-filter-external" onchange="setResourceFilter('external', this.value)">
+        <option value="">全部權限</option>
+        <option value="external" ${RESOURCE_FILTERS.external === 'external' ? 'selected' : ''}>可對外</option>
+        <option value="internal" ${RESOURCE_FILTERS.external === 'internal' ? 'selected' : ''}>內部</option>
+      </select>
+      <select id="res-filter-sort" onchange="setResourceFilter('sort', this.value)">
+        <option value="updated" ${RESOURCE_FILTERS.sort === 'updated' ? 'selected' : ''}>最近更新</option>
+        <option value="type" ${RESOURCE_FILTERS.sort === 'type' ? 'selected' : ''}>依類型</option>
+        <option value="product" ${RESOURCE_FILTERS.sort === 'product' ? 'selected' : ''}>依產品線</option>
+        <option value="title" ${RESOURCE_FILTERS.sort === 'title' ? 'selected' : ''}>依名稱</option>
+      </select>
+      <div class="filter-hit">符合 ${filteredResources.length} / ${RESOURCES.length}${hasFilters ? ` · <button class="btn btn-outline btn-sm" onclick="resetResourceFilters()">清除</button>` : ''}</div>
+    </div>
     <div class="tw">
       <table>
         <thead><tr><th>類型</th><th>資源名稱</th><th>對象</th><th>版本</th><th>權限</th><th>連結</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      ${rows ? '' : '<div class="empty">尚無行銷資源，點擊「＋ 新增資源」開始建立</div>'}
+      ${rows ? '' : `<div class="empty">${RESOURCES.length ? '沒有符合條件的資源，請調整篩選條件' : '尚無行銷資源，點擊「＋ 新增資源」開始建立'}</div>`}
     </div>`;
+}
+
+function filterAndSortResources(list){
+  const q = RESOURCE_FILTERS.q.trim().toLowerCase();
+  return [...list].filter(r => {
+    if (RESOURCE_FILTERS.type && r.resource_type !== RESOURCE_FILTERS.type) return false;
+    if (RESOURCE_FILTERS.audience && r.audience !== RESOURCE_FILTERS.audience) return false;
+    if (RESOURCE_FILTERS.external === 'external' && !r.is_external_usable) return false;
+    if (RESOURCE_FILTERS.external === 'internal' && r.is_external_usable) return false;
+    if (!q) return true;
+    const haystack = [
+      r.title,
+      r.resource_type,
+      r.product_line,
+      r.audience,
+      r.version,
+      r.resource_url,
+      r.canva_url,
+      ...(r.tags || []),
+      r.notes
+    ].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  }).sort((a, b) => {
+    if (RESOURCE_FILTERS.sort === 'type') return `${a.resource_type || ''}${a.title || ''}`.localeCompare(`${b.resource_type || ''}${b.title || ''}`, 'zh-Hant');
+    if (RESOURCE_FILTERS.sort === 'product') return `${a.product_line || ''}${a.title || ''}`.localeCompare(`${b.product_line || ''}${b.title || ''}`, 'zh-Hant');
+    if (RESOURCE_FILTERS.sort === 'title') return (a.title || '').localeCompare(b.title || '', 'zh-Hant');
+    return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+  });
+}
+
+function setResourceFilter(key, value){
+  const activeId = document.activeElement?.id;
+  RESOURCE_FILTERS = { ...RESOURCE_FILTERS, [key]: value };
+  renderResourcesPage(false).then(() => {
+    const el = activeId ? document.getElementById(activeId) : null;
+    if (!el) return;
+    el.focus();
+    if (el.setSelectionRange && el.value != null) {
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    }
+  });
+}
+
+function resetResourceFilters(){
+  RESOURCE_FILTERS = { q: '', type: '', audience: '', external: '', sort: 'updated' };
+  renderResourcesPage(false);
 }
 
 function openResourceModal(id){

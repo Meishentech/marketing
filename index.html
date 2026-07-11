@@ -100,6 +100,10 @@ nav{flex:1;padding:14px 0}
 .stat-box .kpi-bar{background:var(--line)}
 
 .dash-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.filter-bar{background:var(--panel);border:1px solid var(--line);padding:12px;display:grid;grid-template-columns:1.3fr repeat(4,minmax(120px,.75fr)) auto;gap:10px;margin-bottom:16px}
+.filter-bar input,.filter-bar select{width:100%;height:38px;border:1.5px solid var(--line);background:var(--paper);padding:0 10px;font-size:14px;color:var(--text);outline:none;border-radius:3px}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--teal);background:#fff}
+.filter-hit{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);align-self:center;white-space:nowrap}
 .follow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
 .follow-stat{border:1px solid var(--line);background:var(--paper);padding:14px 16px}
 .follow-stat .num{font-family:'Big Shoulders Display',sans-serif;font-size:34px;font-weight:700;line-height:1;color:var(--ink)}
@@ -237,6 +241,7 @@ tbody tr:last-child td{border-bottom:none}
   .fg{grid-template-columns:1fr}
   .stat-row{grid-template-columns:1fr}
   .dash-kpi-grid{grid-template-columns:1fr}
+  .filter-bar{grid-template-columns:1fr}
   .follow-grid,.follow-list{grid-template-columns:1fr}
   .dash-grid{grid-template-columns:1fr}
   .detail-grid{grid-template-columns:1fr}
