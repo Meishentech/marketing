@@ -38,7 +38,7 @@
 - 新增獨立頁面「行銷資源庫」，集中管理簡報、DM、型錄、技術文章、期刊投稿、展場素材、社群文案、圖片影片、案例與其他素材。
 - 每筆資源可記錄產品線、適用對象、版本、資源連結、Canva 連結、是否可對外使用、標籤、備註與主要檔案（PDF、PPT、圖片、DM、型錄等）。
 - 已支援資源名稱/產品線/標籤/備註關鍵字搜尋、類型篩選、適用對象篩選、對外/內部篩選，以及最近更新/類型/產品線/名稱排序。
-- 已支援檔案上傳/下載，使用 Supabase Storage bucket `marketing-resource-files`；上傳檔案大小上限 50MB。
+- 已支援檔案上傳/下載，使用 Supabase Storage bucket `marketing-resource-files`；上傳檔案大小上限 200MB。
 - 新增「對外素材」快速頁，只顯示 `is_external_usable = true` 的資源，供業務快速查詢與下載可提供客戶的素材。
 - 業務只需要查行銷相關資料時，可從此頁快速找到可對外提供的素材，不混入業務自己的商機管理平台。
 
@@ -91,8 +91,9 @@
 13. `schema_v13_user_access.sql`：新表 `app_user_access`，用於平台允許登入名單與首次登入強制改密碼旗標。2026-07-11 已在正式 Supabase project 驗證可用（測試帳號登入後可讀取自身權限列，`is_active = true`、`must_change_password = false`）。
 14. `schema_v14_resource_files.sql`：`marketing_resources` 新增 `file_path`／`file_name`／`file_size`，並建立 private Storage bucket `marketing-resource-files`，用於行銷資源庫檔案上傳/下載。2026-07-11 已在正式 Supabase project 驗證可用（Storage 上傳/簽名下載/刪除 + REST 建立/讀取/刪除成功）。
 15. `schema_v15_priority.sql`：`marketing_campaigns` 新增 `priority`（高/中/低，預設「中」），用於行銷案總表排序。**尚未套用到正式 Supabase project**，需使用者手動到 Dashboard SQL Editor 執行。
+16. `schema_v16_resource_file_size_limit.sql`：將 `marketing-resource-files` Storage bucket 單檔上限提高到 200MB，避免大型 PPT/PDF 上傳時出現 413 Payload too large。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
 
-⚠️ v1~v14 已在正式 Supabase project 執行；v15 待套用。
+⚠️ v1~v14 已在正式 Supabase project 執行；v15、v16 待套用。
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
@@ -117,6 +118,7 @@
 - [x] 套用 `schema_v12_performance_resources.sql` 到正式 Supabase project，啟用行銷成效與行銷資源庫資料表，並用 REST smoke test 建立/讀取/刪除驗證
 - [x] 套用 `schema_v13_user_access.sql` 到正式 Supabase project，啟用平台權限名單與首次登入強制改密碼
 - [x] 套用 `schema_v14_resource_files.sql` 到正式 Supabase project，啟用行銷資源庫檔案上傳/下載
+- [ ] 套用 `schema_v16_resource_file_size_limit.sql` 到正式 Supabase project，把行銷資源庫單檔上傳上限提高到 200MB
 - [x] 完成 8 位新增 Auth 使用者建立，預設密碼均為 `123456`
 
 ## 未解決問題

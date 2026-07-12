@@ -1247,6 +1247,8 @@ async function delPerformance(){
 }
 
 // ── RESOURCES ──
+const RESOURCE_FILE_MAX_BYTES = 200 * 1024 * 1024;
+
 function fmtFileSize(bytes){
   const n = Number(bytes) || 0;
   if (!n) return '';
@@ -1441,6 +1443,11 @@ function renderResourceFileCurrent(){
 
 function onResourceFilePick(input){
   pendingResourceFile = input.files[0] || null;
+  if (pendingResourceFile && pendingResourceFile.size > RESOURCE_FILE_MAX_BYTES) {
+    alert(`檔案超過上傳上限 ${fmtFileSize(RESOURCE_FILE_MAX_BYTES)}，請壓縮後再上傳。`);
+    input.value = '';
+    pendingResourceFile = null;
+  }
   renderResourceFileCurrent();
 }
 
@@ -1462,7 +1469,11 @@ async function saveResource(){
       fileSize = pendingResourceFile.size;
       if (oldPath && oldPath !== filePath) await deleteStorageFile('marketing-resource-files', oldPath);
     } catch (e) {
-      alert('檔案上傳失敗，請確認 schema_v14_resource_files.sql 已執行，且檔案小於 50MB。');
+      const message = e?.message || '';
+      const isTooLarge = message.includes('Payload too large') || message.includes('"413"') || message.includes('413');
+      alert(isTooLarge
+        ? `檔案上傳失敗：檔案超過目前 Storage 上限。請先執行 schema_v16_resource_file_size_limit.sql，或確認檔案小於 ${fmtFileSize(RESOURCE_FILE_MAX_BYTES)}。`
+        : '檔案上傳失敗，請確認 schema_v14_resource_files.sql 與 schema_v16_resource_file_size_limit.sql 已執行。');
       return;
     }
   }
