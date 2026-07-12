@@ -323,6 +323,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="ni" data-view="performance" onclick="nav('performance')">成效查詢</div>
     <div class="ni" data-view="resources" onclick="nav('resources')">行銷資源庫</div>
     <div class="ni" data-view="externalResources" onclick="nav('externalResources')">對外素材</div>
+    <div class="ni" data-view="associations" onclick="nav('associations')">公會管理</div>
     <div class="ni" data-view="news" onclick="nav('news')">新聞蒐集</div>
     <div class="ni" data-view="drafts" onclick="nav('drafts')">每週文案彙整</div>
     <div class="ni" data-view="cases" onclick="nav('cases')">成功案例</div>
@@ -331,6 +332,112 @@ tbody tr:last-child td{border-bottom:none}
 </div>
 
 <div id="main"><div id="vc"></div></div>
+
+<!-- 公會資料 modal -->
+<div class="mo" id="massociation">
+  <div class="md">
+    <div class="mh"><div class="mt" id="am-title">新增公會</div><button class="mc" onclick="closeM('massociation')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會名稱 *</label><input id="am-name"></div>
+      <div class="fg1"><label class="fl">公會類型</label><select id="am-type"><option>全國聯合會</option><option>地方公會</option><option>技師公會</option><option>其他</option></select></div>
+      <div class="fg1"><label class="fl">加入狀態</label><select id="am-status"><option>已加入</option><option>待確認</option><option>待續會</option><option>停止</option></select></div>
+      <div class="fg1"><label class="fl">會員編號</label><input id="am-member"></div>
+      <div class="fg1"><label class="fl">主要聯絡人</label><input id="am-contact"></div>
+      <div class="fg1"><label class="fl">聯絡電話</label><input id="am-phone"></div>
+      <div class="fg1"><label class="fl">Email</label><input id="am-email" type="email"></div>
+      <div class="fg1 ff"><label class="fl">地址</label><input id="am-address"></div>
+      <div class="fg1 ff"><label class="fl">官方網站</label><input id="am-website" placeholder="https://..."></div>
+      <div class="fg1 ff"><label class="fl">LINE / 群組連結</label><input id="am-line"></div>
+      <div class="fg1"><label class="fl">內部負責人</label><input id="am-owner"></div>
+      <div class="fg1 ff"><label class="fl">備註</label><textarea id="am-notes"></textarea></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="am-delete" onclick="delAssociation()">刪除</button><button class="btn btn-outline" onclick="closeM('massociation')">取消</button><button class="btn btn-primary" onclick="saveAssociation()">儲存</button></div>
+  </div>
+</div>
+
+<!-- 公會年費 modal -->
+<div class="mo" id="massocfee">
+  <div class="md">
+    <div class="mh"><div class="mt" id="af-title">新增年費與續會</div><button class="mc" onclick="closeM('massocfee')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會</label><select id="af-assoc"></select></div>
+      <div class="fg1"><label class="fl">年度</label><input id="af-year" type="number"></div>
+      <div class="fg1"><label class="fl">年費金額</label><input id="af-amount" type="number"></div>
+      <div class="fg1"><label class="fl">繳費狀態</label><select id="af-status"><option>未繳</option><option>已繳</option><option>待確認</option><option>不適用</option></select></div>
+      <div class="fg1"><label class="fl">繳費日期</label><input id="af-paid" type="date"></div>
+      <div class="fg1"><label class="fl">到期日</label><input id="af-due" type="date"></div>
+      <div class="fg1"><label class="fl">發票 / 收據狀態</label><input id="af-receipt-status"></div>
+      <div class="fg1"><label class="fl">續會提醒日期</label><input id="af-reminder" type="date"></div>
+      <div class="fg1 ff"><label class="fl">收據檔案或附件</label><input id="af-attachment" placeholder="附件連結、檔名或存放位置"></div>
+      <div class="fg1 ff"><label class="fl">備註</label><textarea id="af-notes"></textarea></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="af-delete" onclick="delAssocFee()">刪除</button><button class="btn btn-outline" onclick="closeM('massocfee')">取消</button><button class="btn btn-primary" onclick="saveAssocFee()">儲存</button></div>
+  </div>
+</div>
+
+<!-- 公會權益 modal -->
+<div class="mo" id="massocbenefit">
+  <div class="md">
+    <div class="mh"><div class="mt" id="ab-title">新增會員權益</div><button class="mc" onclick="closeM('massocbenefit')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會</label><select id="ab-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">權益名稱 *</label><input id="ab-name"></div>
+      <div class="fg1"><label class="fl">權益類型</label><select id="ab-type"><option>期刊曝光</option><option>活動參與</option><option>協辦活動</option><option>會員名錄</option><option>課程講座</option><option>其他</option></select></div>
+      <div class="fg1"><label class="fl">使用狀態</label><select id="ab-status"><option>未使用</option><option>準備中</option><option>已使用</option><option>不適用</option></select></div>
+      <div class="fg1"><label class="fl">有效期限</label><input id="ab-valid" type="date"></div>
+      <div class="fg1"><label class="fl">負責人</label><input id="ab-owner"></div>
+      <div class="fg1 ff"><label class="fl">權益說明</label><textarea id="ab-desc"></textarea></div>
+      <div class="fg1 ff"><label class="fl">備註</label><textarea id="ab-notes"></textarea></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="ab-delete" onclick="delAssocBenefit()">刪除</button><button class="btn btn-outline" onclick="closeM('massocbenefit')">取消</button><button class="btn btn-primary" onclick="saveAssocBenefit()">儲存</button></div>
+  </div>
+</div>
+
+<!-- 公會期刊 modal -->
+<div class="mo" id="massocpub">
+  <div class="md">
+    <div class="mh"><div class="mt" id="ap-title">新增期刊排程</div><button class="mc" onclick="closeM('massocpub')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會</label><select id="ap-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">期刊名稱 *</label><input id="ap-name"></div>
+      <div class="fg1"><label class="fl">發刊日期</label><input id="ap-publish" type="date"></div>
+      <div class="fg1"><label class="fl">截稿日期</label><input id="ap-deadline" type="date"></div>
+      <div class="fg1 ff"><label class="fl">版面 / 廣告規格</label><input id="ap-spec"></div>
+      <div class="fg1 ff"><label class="fl">主題</label><input id="ap-topic"></div>
+      <div class="fg1 ff"><label class="fl">所需素材</label><input id="ap-materials" placeholder="公司介紹、產品圖片、文案、Logo、案例、廣告圖"></div>
+      <div class="fg1"><label class="fl">素材準備狀態</label><select id="ap-status"><option>未開始</option><option>準備中</option><option>已送審</option><option>已送件</option><option>已刊登</option></select></div>
+      <div class="fg1"><label class="fl">負責人</label><input id="ap-owner"></div>
+      <div class="fg1"><label class="fl">送件日期</label><input id="ap-submit" type="date"></div>
+      <div class="fg1 ff"><label class="fl">刊登成果備註</label><textarea id="ap-result"></textarea></div>
+      <div class="fg1 ff"><label class="fl">附件</label><input id="ap-attachment" placeholder="附件連結、檔名或存放位置"></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="ap-delete" onclick="delAssocPub()">刪除</button><button class="btn btn-outline" onclick="closeM('massocpub')">取消</button><button class="btn btn-primary" onclick="saveAssocPub()">儲存</button></div>
+  </div>
+</div>
+
+<!-- 公會活動 modal -->
+<div class="mo" id="massocevent">
+  <div class="md">
+    <div class="mh"><div class="mt" id="ae-title">新增會員大會 / 活動</div><button class="mc" onclick="closeM('massocevent')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會</label><select id="ae-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">活動名稱 *</label><input id="ae-name"></div>
+      <div class="fg1"><label class="fl">活動類型</label><select id="ae-type"><option>會員大會</option><option>協辦活動</option><option>技術講座</option><option>展覽</option><option>餐會</option><option>其他</option></select></div>
+      <div class="fg1"><label class="fl">日期</label><input id="ae-date" type="date"></div>
+      <div class="fg1 ff"><label class="fl">地點</label><input id="ae-location"></div>
+      <div class="fg1"><label class="fl">主辦單位</label><input id="ae-organizer"></div>
+      <div class="fg1"><label class="fl">美昇角色</label><select id="ae-role"><option value="">未填</option><option>會員參與</option><option>協辦</option><option>贊助</option><option>講師</option><option>展示</option></select></div>
+      <div class="fg1"><label class="fl">預算</label><input id="ae-budget" type="number"></div>
+      <div class="fg1"><label class="fl">實際支出</label><input id="ae-spend" type="number"></div>
+      <div class="fg1 ff"><label class="fl">需準備資料</label><input id="ae-materials" placeholder="DM、簡報、名片、禮品、產品資料、展示品"></div>
+      <div class="fg1"><label class="fl">活動狀態</label><select id="ae-status"><option>待確認</option><option>準備中</option><option>已完成</option><option>取消</option></select></div>
+      <div class="fg1"><label class="fl">負責人</label><input id="ae-owner"></div>
+      <div class="fg1 ff"><label class="fl">活動成果</label><textarea id="ae-result" placeholder="名單、照片、商機、後續拜訪"></textarea></div>
+      <div class="fg1 ff"><label class="fl">附件</label><input id="ae-attachment" placeholder="附件連結、檔名或存放位置"></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="ae-delete" onclick="delAssocEvent()">刪除</button><button class="btn btn-outline" onclick="closeM('massocevent')">取消</button><button class="btn btn-primary" onclick="saveAssocEvent()">儲存</button></div>
+  </div>
+</div>
 
 <!-- 行銷案 modal -->
 <div class="mo" id="mcampaign">

@@ -46,11 +46,19 @@
 - 首頁已精簡成四塊：進行中專案、待決事項、近期成效、可用素材更新。
 - 預算分類、Top 5、詳細風險/時程等資訊改回各功能頁查詢，避免首頁過載。
 
-### 5. 新聞蒐集
+### 5. 公會管理
+- 新增主選單「公會管理」，第一階段以實際後台資料管理為主，不做行銷 landing page。
+- 頁面包含：公會總覽、年費與續會、期刊資料準備排程、會員大會 / 協辦活動、權益與備註。
+- 公會總覽會彙總加入狀態、本年度年費狀態、年費到期日、最近期刊截稿日、下一場活動、未使用權益數、內部負責人與最後更新時間。
+- 狀態標籤包含：年費即將到期、期刊截稿將至、活動準備中、權益尚未使用、資料待補。
+- 初始 seed 會建立四筆公會：全國聯合會、台北市冷凍空調技師公會、台灣省冷凍空調技師公會、台中市冷凍空調技師公會。未知欄位先留空或標示待補。
+- 第一階段附件欄位先以「附件連結、檔名或存放位置」文字欄位保留，尚未接 Supabase Storage 檔案上傳。
+
+### 6. 新聞蒐集
 - 依關鍵字抓 Google News RSS，經 `functions/api/news.js`（Cloudflare Pages Function）→ rss2json.com 中轉（**必須**用 API key，匿名額度太低會 429/500；直接抓 Google 會被封鎖回傳 503「Sorry...」機器人偵測頁）
 - 可新增/刪除關鍵字，抓到的新聞可一鍵「＋建立文案草稿」帶入標題/連結
 
-### 6. 每週文案彙整
+### 7. 每週文案彙整
 - 手動：依週分組顯示草稿，新增/編輯/刪除，「複製」單則或整週到剪貼簿
 - **自動**（`.github/workflows/weekly-content.yml` + `scripts/generate-weekly-content.mjs`）：
   - 每週一台北時間 08:00 排程，也可在 GitHub Actions 頁面手動 "Run workflow" 測試
@@ -59,13 +67,13 @@
   - 提示詞內建真實產品資訊（`PRODUCT_REFERENCE`，取自 www.mcttw.com.tw：MagBoost Apex/MagBoost/變頻直驅/AirBoost MAG 各系列規格），**只能引用真實規格，不可捏造**；曾在測試中出現「Modbus」被幻覺成「Mod875」，人工審核時要特別注意技術名詞
   - 若產品線異動，`PRODUCT_REFERENCE` 需同步更新，否則文案會用到過時資訊
 
-### 7. 成功案例（新）
+### 8. 成功案例（新）
 - 原廠案例照片的處理流程：**不走自動化 API**，直接把照片貼到 Claude Code 對話裡，由 Claude 讀圖翻譯（簡體→繁體＋台灣業界用語）＋整理重點，再用 Canva MCP（已連結美昇品牌套件）產出設計
 - 整理完的資訊存入「成功案例」專區：標題／案場／產品型號／案例摘要／成效數字／標籤／封面照片（Supabase Storage）／Canva 設計連結
 - 成功案例列表與編輯視窗已支援登入後下載封面圖片，讓業務可自行查詢並下載案例素材。
 - `core/api.js` 新增 storage 輔助函式：`uploadStorageFile`、`getSignedUrl`、`deleteStorageFile`、`storageSafeFileName`
 
-### 8. 帳號與密碼
+### 9. 帳號與密碼
 - 登入頁新增「忘記密碼」，使用 Supabase Auth recovery email 流程，使用者可自行設定新密碼。
 - `app_user_access` 權限表記錄允許登入名單、是否啟用、是否必須首次登入改密碼。前端登入後會查此表；若 `must_change_password = true`，會先要求設定新密碼，完成後才進平台。
 - 2026-07-11 已用 Supabase public signup API 建立 8 位新增使用者 Auth 帳號：`kevin@mcttw.com.tw`、`lungbin5412@mcttw.com.tw`、`c1994915@mcttw.com.tw`、`eric@mcttw.com.tw`、`vincent@mcttw.com.tw`、`hill22518@mcttw.com.tw`、`info@mcttw.com.tw`、`hansLee0408@mcttw.com.tw`，預設密碼均為 `123456`。
@@ -92,8 +100,9 @@
 14. `schema_v14_resource_files.sql`：`marketing_resources` 新增 `file_path`／`file_name`／`file_size`，並建立 private Storage bucket `marketing-resource-files`，用於行銷資源庫檔案上傳/下載。2026-07-11 已在正式 Supabase project 驗證可用（Storage 上傳/簽名下載/刪除 + REST 建立/讀取/刪除成功）。
 15. `schema_v15_priority.sql`：`marketing_campaigns` 新增 `priority`（高/中/低，預設「中」），用於行銷案總表排序。**尚未套用到正式 Supabase project**，需使用者手動到 Dashboard SQL Editor 執行。
 16. `schema_v16_resource_file_size_limit.sql`：將 `marketing-resource-files` Storage bucket 單檔上限提高到 200MB，避免大型 PPT/PDF 上傳時出現 413 Payload too large。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
+17. `schema_v17_associations.sql`：新增公會管理資料表 `associations`、`association_fee_records`、`association_benefits`、`association_publication_schedules`、`association_events`，並 seed 四筆初始公會。**已新增檔案，尚待在正式 Supabase SQL Editor 執行並驗證。**
 
-⚠️ v1~v14 已在正式 Supabase project 執行；v15、v16 待套用。
+⚠️ v1~v14 已在正式 Supabase project 執行；v15、v16、v17 待套用。
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
@@ -119,6 +128,7 @@
 - [x] 套用 `schema_v13_user_access.sql` 到正式 Supabase project，啟用平台權限名單與首次登入強制改密碼
 - [x] 套用 `schema_v14_resource_files.sql` 到正式 Supabase project，啟用行銷資源庫檔案上傳/下載
 - [ ] 套用 `schema_v16_resource_file_size_limit.sql` 到正式 Supabase project，把行銷資源庫單檔上傳上限提高到 200MB
+- [ ] 套用 `schema_v17_associations.sql` 到正式 Supabase project，啟用公會管理第一階段並建立四筆初始公會
 - [x] 完成 8 位新增 Auth 使用者建立，預設密碼均為 `123456`
 
 ## 未解決問題
