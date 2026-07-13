@@ -2849,6 +2849,61 @@ async function delCaseStudy(){
   await renderCasesPage();
 }
 
+function sqlFileFromUrl(){
+  const params = new URLSearchParams(location.search);
+  const file = params.get('sql');
+  if (!file) return '';
+  if (!/^schema_v\d+_[a-z0-9_]+\.sql$/i.test(file)) return '';
+  return file;
+}
+
+async function showSqlFile(file){
+  const screen = document.getElementById('sql-screen');
+  if (!screen) return false;
+  document.getElementById('login-screen')?.classList.add('hidden');
+  document.getElementById('password-screen')?.classList.remove('open');
+  document.getElementById('sidebar').style.display = 'none';
+  document.getElementById('main').style.display = 'none';
+  screen.classList.add('open');
+  document.getElementById('sql-file-name').textContent = file || '未指定檔案';
+  const code = document.getElementById('sql-code');
+  const msg = document.getElementById('sql-message');
+  if (!file) {
+    code.textContent = '';
+    msg.style.display = '';
+    msg.textContent = '找不到 SQL 檔案名稱。';
+    return true;
+  }
+  try {
+    const res = await fetch(file, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    code.textContent = await res.text();
+    msg.style.display = 'none';
+  } catch (e) {
+    code.textContent = '';
+    msg.style.display = '';
+    msg.textContent = 'SQL 檔案載入失敗，請確認連結是否正確。';
+  }
+  return true;
+}
+
+async function copySqlText(){
+  const text = document.getElementById('sql-code')?.textContent || '';
+  if (!text.trim()) { alert('目前沒有可複製的 SQL'); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('SQL 已複製');
+  } catch (e) {
+    const code = document.getElementById('sql-code');
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    alert('已選取 SQL，請手動複製');
+  }
+}
+
 // ── MODAL ──
 function openM(id){ document.getElementById(id).classList.add('open'); }
 function closeM(id){ document.getElementById(id).classList.remove('open'); }

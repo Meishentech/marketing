@@ -52,6 +52,15 @@ h1,h2,.display{font-family:'Big Shoulders Display',sans-serif;font-weight:700;le
 .login-link{display:block;width:100%;background:none;border:none;color:var(--teal);font-size:13px;margin-top:14px;text-align:center}
 .login-link:hover{text-decoration:underline}
 .login-note{font-size:13px;color:var(--muted);line-height:1.5;margin-top:12px;text-align:center}
+#sql-screen{display:none;min-height:100vh;background:var(--paper);padding:28px}
+#sql-screen.open{display:block}
+.sql-shell{max-width:1040px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--teal);box-shadow:0 12px 34px rgba(18,33,43,.08)}
+.sql-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:18px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.sql-title{font-family:'Big Shoulders Display',sans-serif;font-size:24px;font-weight:800;color:var(--ink)}
+.sql-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.sql-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sql-code{margin:0;padding:18px 20px;white-space:pre-wrap;word-break:break-word;background:#102027;color:#E8F1ED;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.6;max-height:70vh;overflow:auto}
+.sql-message{padding:24px 20px;color:var(--muted)}
 #password-screen{display:none;position:fixed;inset:0;background:linear-gradient(0deg, rgba(18,33,43,.94), rgba(18,33,43,.94));z-index:10000;align-items:center;justify-content:center}
 #password-screen.open{display:flex}
 
@@ -272,6 +281,7 @@ tbody tr:last-child td{border-bottom:none}
   .ni.on{border-left-color:transparent;border-bottom-color:var(--teal)}
   .sfooter{border-top:none;margin-left:auto;padding:10px 14px}
   #main{margin-left:0;padding:18px 16px}
+  #sql-screen{padding:14px}
   .fg{grid-template-columns:1fr}
   .stat-row{grid-template-columns:1fr}
   .dash-kpi-grid{grid-template-columns:1fr}
@@ -334,6 +344,23 @@ tbody tr:last-child td{border-bottom:none}
       <button class="login-link" onclick="doLogout(false)">取消並登出</button>
       <div class="login-err" id="pw-err"></div>
     </div>
+  </div>
+</div>
+
+<div id="sql-screen">
+  <div class="sql-shell">
+    <div class="sql-head">
+      <div>
+        <div class="sql-title">SQL 更新腳本</div>
+        <div class="sql-sub" id="sql-file-name">Loading</div>
+      </div>
+      <div class="sql-actions">
+        <button class="btn btn-outline" onclick="copySqlText()">複製 SQL</button>
+        <button class="btn btn-primary" onclick="location.href='/'">返回平台</button>
+      </div>
+    </div>
+    <pre class="sql-code" id="sql-code"></pre>
+    <div class="sql-message" id="sql-message" style="display:none"></div>
   </div>
 </div>
 
@@ -870,6 +897,8 @@ tbody tr:last-child td{border-bottom:none}
 <script src="app.js"></script>
 <script>
 (async function init(){
+  const sqlFile = sqlFileFromUrl();
+  if (sqlFile) { await showSqlFile(sqlFile); return; }
   if (await handleAuthRedirect()) return;
   if (await checkAuth()) {
     await completeLogin(sessionStorage.getItem('ms_email') || '', 'dashboard');
