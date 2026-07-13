@@ -40,6 +40,7 @@ let ASSOC_FEES = [];
 let ASSOC_BENEFITS = [];
 let ASSOC_PUBLICATIONS = [];
 let ASSOC_EVENTS = [];
+let ASSOC_NOTES = [];
 let RESOURCE_FILTERS = { q: '', type: '', audience: '', external: '', sort: 'updated' };
 let ASSOC_TAB = 'overview';
 let _view = 'dashboard';
@@ -58,6 +59,7 @@ let editAssocFeeId = null;
 let editAssocBenefitId = null;
 let editAssocPubId = null;
 let editAssocEventId = null;
+let editAssocNoteId = null;
 let quickRiskId = null;
 let detailCampaignId = null;
 let detailCampaignCache = null;
@@ -1548,17 +1550,33 @@ function simpleStatusTag(status){
   return `<span class="tag tag-${cls}">${esc(status || '-')}</span>`;
 }
 async function loadAssociationsData(){
-  [ASSOCIATIONS, ASSOC_FEES, ASSOC_BENEFITS, ASSOC_PUBLICATIONS, ASSOC_EVENTS] = await Promise.all([
+  [ASSOCIATIONS, ASSOC_FEES, ASSOC_BENEFITS, ASSOC_PUBLICATIONS, ASSOC_EVENTS, ASSOC_NOTES] = await Promise.all([
     safeGET('associations?order=updated_at.desc'),
     safeGET('association_fee_records?order=year.desc,due_date.asc'),
     safeGET('association_benefits?order=valid_until.asc'),
     safeGET('association_publication_schedules?order=deadline_date.asc'),
-    safeGET('association_events?order=event_date.asc')
+    safeGET('association_events?order=event_date.asc'),
+    safeGET('association_notes?order=updated_at.desc')
   ]);
 }
 function latestFee(associationId){
   return ASSOC_FEES.filter(f => f.association_id === associationId)
     .sort((a, b) => (b.year || 0) - (a.year || 0) || String(a.due_date || '9999').localeCompare(String(b.due_date || '9999')))[0];
+}
+function currentYearFee(associationId){
+  const y = new Date().getFullYear();
+  return ASSOC_FEES.find(f => f.association_id === associationId && Number(f.year) === y) || latestFee(associationId);
+}
+function latestAssocUpdated(a){
+  const related = [
+    a?.updated_at,
+    ...ASSOC_FEES.filter(x => x.association_id === a.id).map(x => x.updated_at),
+    ...ASSOC_BENEFITS.filter(x => x.association_id === a.id).map(x => x.updated_at),
+    ...ASSOC_PUBLICATIONS.filter(x => x.association_id === a.id).map(x => x.updated_at),
+    ...ASSOC_EVENTS.filter(x => x.association_id === a.id).map(x => x.updated_at),
+    ...ASSOC_NOTES.filter(x => x.association_id === a.id).map(x => x.updated_at),
+  ].filter(Boolean).sort();
+  return related.at(-1) || a?.updated_at || '';
 }
 function nextPublication(associationId){
   return ASSOC_PUBLICATIONS.filter(p => p.association_id === associationId && p.material_status !== '已刊登')
@@ -1572,7 +1590,7 @@ function unusedBenefitCount(associationId){
   return ASSOC_BENEFITS.filter(b => b.association_id === associationId && ['未使用','準備中'].includes(b.usage_status)).length;
 }
 function assocBadges(a){
-  const fee = latestFee(a.id);
+  const fee = currentYearFee(a.id);
   const pub = nextPublication(a.id);
   const ev = nextAssocEvent(a.id);
   const badges = [];
@@ -1586,12 +1604,13 @@ function assocBadges(a){
 function assocTabs(){
   const tabs = [
     ['overview','公會總覽'],
+    ['details','公會資料詳情'],
     ['fees','年費與續會'],
     ['publications','期刊資料準備排程'],
     ['events','會員大會 / 協辦活動'],
     ['benefits','權益與備註']
   ];
-  return `<div class="filter-bar" style="grid-template-columns:repeat(5,minmax(120px,1fr));margin-bottom:16px">
+  return `<div class="filter-bar" style="grid-template-columns:repeat(6,minmax(120px,1fr));margin-bottom:16px">
     ${tabs.map(([key, label]) => `<button class="btn ${ASSOC_TAB === key ? 'btn-primary' : 'btn-outline'}" onclick="setAssocTab('${key}')">${label}</button>`).join('')}
   </div>`;
 }
@@ -1604,10 +1623,11 @@ async function renderAssociationsPage(load = true){
   if (load) await loadAssociationsData();
   const actions = {
     overview: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
+    details: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
     fees: '<button class="btn btn-primary" onclick="openAssocFeeModal()">＋ 新增年費</button>',
     publications: '<button class="btn btn-primary" onclick="openAssocPubModal()">＋ 新增期刊排程</button>',
     events: '<button class="btn btn-primary" onclick="openAssocEventModal()">＋ 新增活動</button>',
-    benefits: '<button class="btn btn-primary" onclick="openAssocBenefitModal()">＋ 新增權益</button>'
+    benefits: '<button class="btn btn-outline" onclick="openAssocNoteModal()">＋ 新增備註</button> <button class="btn btn-primary" onclick="openAssocBenefitModal()">＋ 新增權益</button>'
   }[ASSOC_TAB];
   document.getElementById('vc').innerHTML = `
     <div class="ph"><div><div class="pt">公會管理</div><div class="ps">管理加入公會、年費續會、會員權益、期刊排程與會員大會/協辦活動</div></div>${actions}</div>
@@ -1615,6 +1635,7 @@ async function renderAssociationsPage(load = true){
     ${renderAssociationTab()}`;
 }
 function renderAssociationTab(){
+  if (ASSOC_TAB === 'details') return renderAssocDetails();
   if (ASSOC_TAB === 'fees') return renderAssocFees();
   if (ASSOC_TAB === 'publications') return renderAssocPublications();
   if (ASSOC_TAB === 'events') return renderAssocEvents();
@@ -1627,7 +1648,7 @@ function renderAssocOverview(){
     const pub = nextPublication(a.id);
     const ev = nextAssocEvent(a.id);
     return `<tr onclick="openAssociationModal('${a.id}')">
-      <td class="tb-name">${esc(a.name)}<div class="case-tags">${assocBadges(a)}</div></td>
+      <td class="tb-name">${esc(a.name)}<div class="muted-text">${esc(a.association_type || '待補')}</div></td>
       <td>${assocStatusTag(a.join_status)}</td>
       <td>${fee ? simpleStatusTag(fee.payment_status) : '<span class="muted-text">待補</span>'}</td>
       <td>${fdFull(fee?.due_date || '')}</td>
@@ -1635,7 +1656,8 @@ function renderAssocOverview(){
       <td>${ev ? `${fdFull(ev.event_date || '')}<div class="muted-text">${esc(ev.event_name)}</div>` : '<span class="muted-text">待補</span>'}</td>
       <td class="mono">${unusedBenefitCount(a.id)}</td>
       <td>${esc(a.internal_owner || '待補')}</td>
-      <td>${fdFull(a.updated_at?.slice(0, 10) || '')}</td>
+      <td>${fdFull(latestAssocUpdated(a).slice(0, 10) || '')}</td>
+      <td><div class="case-tags">${assocBadges(a) || '<span class="case-tag">目前無提醒</span>'}</div></td>
     </tr>`;
   }).join('');
   return `<div class="dash-kpi-grid">
@@ -1645,9 +1667,30 @@ function renderAssocOverview(){
     <div class="stat-box"><div class="kpi-label">未使用權益</div><div class="stat-num mono">${ASSOC_BENEFITS.filter(b => ['未使用','準備中'].includes(b.usage_status)).length}</div></div>
   </div>
   <div class="tw"><table>
-    <thead><tr><th>公會名稱</th><th>加入狀態</th><th>本年度年費狀態</th><th>年費到期日</th><th>最近期刊截稿日</th><th>下一場活動 / 會員大會</th><th>未使用權益數</th><th>內部負責人</th><th>最後更新</th></tr></thead>
+    <thead><tr><th>公會名稱</th><th>加入狀態</th><th>本年度年費狀態</th><th>年費到期日</th><th>最近期刊截稿日</th><th>下一場活動 / 會員大會</th><th>未使用權益數</th><th>內部負責人</th><th>最後更新</th><th>狀態標籤</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>${rows ? '' : '<div class="empty">尚無公會資料，請先新增公會或執行 schema_v17_associations.sql</div>'}</div>`;
+}
+function renderAssocDetails(){
+  const rows = ASSOCIATIONS.map(a => `
+    <div class="card" style="margin-bottom:12px">
+      <div class="dash-panel-head">
+        <div><div class="dash-panel-title">${esc(a.name)}</div><div class="muted-text">${esc(a.association_type || '待補')}｜${assocStatusTag(a.join_status)}</div></div>
+        <button class="btn btn-sm btn-outline" onclick="openAssociationModal('${a.id}')">編輯</button>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-block"><div class="kpi-label">會員編號</div><div>${esc(a.member_no || '待補')}</div></div>
+        <div class="detail-block"><div class="kpi-label">主要聯絡人</div><div>${esc(a.primary_contact || '待補')}</div></div>
+        <div class="detail-block"><div class="kpi-label">聯絡電話</div><div>${esc(a.phone || '待補')}</div></div>
+        <div class="detail-block"><div class="kpi-label">Email</div><div>${esc(a.email || '待補')}</div></div>
+        <div class="detail-block"><div class="kpi-label">地址</div><div>${esc(a.address || '待補')}</div></div>
+        <div class="detail-block"><div class="kpi-label">官方網站</div><div>${a.website ? `<a href="${esc(a.website)}" target="_blank" rel="noopener">${esc(a.website)}</a>` : '待補'}</div></div>
+        <div class="detail-block"><div class="kpi-label">LINE / 群組連結</div><div>${esc(a.line_url || '待補')}</div></div>
+        <div class="detail-block"><div class="kpi-label">內部負責人</div><div>${esc(a.internal_owner || '待補')}</div></div>
+        <div class="detail-block ff"><div class="kpi-label">備註</div><div class="detail-text">${esc(a.notes || '待補')}</div></div>
+      </div>
+    </div>`).join('');
+  return rows || '<div class="empty">尚無公會資料</div>';
 }
 function renderAssocFees(){
   const rows = ASSOC_FEES.map(f => `<tr onclick="openAssocFeeModal('${f.id}')">
@@ -1659,7 +1702,11 @@ function renderAssocBenefits(){
   const rows = ASSOC_BENEFITS.map(b => `<tr onclick="openAssocBenefitModal('${b.id}')">
     <td class="tb-name">${esc(assocName(b.association_id))}</td><td>${esc(b.benefit_name)}</td><td><span class="case-tag">${esc(b.benefit_type)}</span></td><td>${simpleStatusTag(b.usage_status)}</td><td>${fdFull(b.valid_until || '')}</td><td>${esc(b.owner || '-')}</td><td>${esc(b.notes || b.description || '-')}</td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>權益名稱</th><th>權益類型</th><th>使用狀態</th><th>有效期限</th><th>負責人</th><th>說明/備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員權益紀錄</div>'}</div>`;
+  const noteRows = ASSOC_NOTES.map(n => `<tr onclick="openAssocNoteModal('${n.id}')">
+    <td class="tb-name">${esc(assocName(n.association_id))}</td><td>${esc(n.note_title)}</td><td>${esc(n.owner || '-')}</td><td>${esc(n.attachment || '-')}</td><td>${esc(n.note || '-')}</td><td>${fdFull(n.updated_at?.slice(0, 10) || '')}</td>
+  </tr>`).join('');
+  return `<div class="card" style="margin-bottom:16px"><div class="dash-panel-head"><div><div class="dash-panel-title">會員權益</div><div class="muted-text">期刊曝光、活動參與、協辦活動、會員名錄與課程講座</div></div></div><div class="tw"><table><thead><tr><th>公會</th><th>權益名稱</th><th>權益類型</th><th>使用狀態</th><th>有效期限</th><th>負責人</th><th>說明/備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員權益紀錄</div>'}</div></div>
+  <div class="card"><div class="dash-panel-head"><div><div class="dash-panel-title">備註與附件</div><div class="muted-text">記錄跨年度待補事項、雲端連結、檔名或附件存放位置</div></div><button class="btn btn-sm btn-primary" onclick="openAssocNoteModal()">＋ 新增備註</button></div><div class="tw"><table><thead><tr><th>公會</th><th>備註標題</th><th>負責人</th><th>附件欄位</th><th>備註內容</th><th>最後更新</th></tr></thead><tbody>${noteRows}</tbody></table>${noteRows ? '' : '<div class="empty">尚無備註附件紀錄；若儲存時出現錯誤，請先執行 schema_v18_association_notes.sql</div>'}</div></div>`;
 }
 function renderAssocPublications(){
   const rows = ASSOC_PUBLICATIONS.map(p => `<tr onclick="openAssocPubModal('${p.id}')">
@@ -1849,6 +1896,41 @@ async function saveAssocEvent(){
   closeM('massocevent'); ASSOC_TAB = 'events'; await renderAssociationsPage();
 }
 async function delAssocEvent(){ if (!editAssocEventId || !confirm('確定刪除此活動？')) return; await DEL(`association_events?id=eq.${editAssocEventId}`); closeM('massocevent'); ASSOC_TAB = 'events'; await renderAssociationsPage(); }
+
+function openAssocNoteModal(id){
+  editAssocNoteId = id || null;
+  const n = id ? ASSOC_NOTES.find(x => x.id === id) : null;
+  document.getElementById('an-title').textContent = id ? '編輯備註附件' : '新增備註附件';
+  setAssocSelect('an-assoc', n?.association_id || defaultAssocId());
+  document.getElementById('an-name').value = n?.note_title || '';
+  document.getElementById('an-owner').value = n?.owner || '';
+  document.getElementById('an-attachment').value = n?.attachment || '';
+  document.getElementById('an-note').value = n?.note || '';
+  document.getElementById('an-delete').style.display = id ? '' : 'none';
+  openM('massocnote');
+}
+async function saveAssocNote(){
+  const title = document.getElementById('an-name').value.trim();
+  if (!title) { alert('請輸入備註標題'); return; }
+  const payload = {
+    association_id: document.getElementById('an-assoc').value,
+    note_title: title,
+    owner: document.getElementById('an-owner').value.trim() || null,
+    attachment: document.getElementById('an-attachment').value.trim() || null,
+    note: document.getElementById('an-note').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (editAssocNoteId) await PATCH(`association_notes?id=eq.${editAssocNoteId}`, payload);
+    else await POST('association_notes', payload);
+  } catch (e) { alert('備註附件資料表尚未啟用，請先執行 schema_v18_association_notes.sql。'); return; }
+  closeM('massocnote'); ASSOC_TAB = 'benefits'; await renderAssociationsPage();
+}
+async function delAssocNote(){
+  if (!editAssocNoteId || !confirm('確定刪除此備註附件？')) return;
+  await DEL(`association_notes?id=eq.${editAssocNoteId}`);
+  closeM('massocnote'); ASSOC_TAB = 'benefits'; await renderAssociationsPage();
+}
 
 function distinctUnits(){
   return [...new Set(CAMPAIGNS.map(c => c.owner_unit).filter(Boolean))].sort();

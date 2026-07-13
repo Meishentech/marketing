@@ -439,6 +439,22 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+
+<!-- 公會備註附件 modal -->
+<div class="mo" id="massocnote">
+  <div class="md">
+    <div class="mh"><div class="mt" id="an-title">新增備註附件</div><button class="mc" onclick="closeM('massocnote')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會</label><select id="an-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">備註標題 *</label><input id="an-name"></div>
+      <div class="fg1"><label class="fl">負責人</label><input id="an-owner"></div>
+      <div class="fg1 ff"><label class="fl">附件欄位</label><input id="an-attachment" placeholder="附件連結、檔名或存放位置"></div>
+      <div class="fg1 ff"><label class="fl">備註內容</label><textarea id="an-note"></textarea></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="an-delete" onclick="delAssocNote()">刪除</button><button class="btn btn-outline" onclick="closeM('massocnote')">取消</button><button class="btn btn-primary" onclick="saveAssocNote()">儲存</button></div>
+  </div>
+</div>
+
 <!-- 行銷案 modal -->
 <div class="mo" id="mcampaign">
   <div class="md">
