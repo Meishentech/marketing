@@ -3019,7 +3019,7 @@ function tenderProjectDetail(project, keywordRows, resultRows, runRows){
     </div>
     <div class="dash-kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-bottom:16px">
       <div class="card dash-panel">
-        <div class="dash-panel-head"><div><div class="dash-panel-title">關鍵字</div><div class="muted-text">可自行新增、停用或刪除</div></div></div>
+        <div class="dash-panel-head"><div><div class="dash-panel-title">關鍵字</div><div class="muted-text">${project.scan_mode === '主動找案' ? '可選；未填時會從搜尋指令推導' : '可自行新增、停用或刪除'}</div></div></div>
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <input id="tk-keyword" placeholder="新增關鍵字，例如 冰水主機" onkeydown="if(event.key==='Enter') saveTenderKeyword()">
           <button class="btn btn-primary btn-sm" onclick="saveTenderKeyword()">新增</button>

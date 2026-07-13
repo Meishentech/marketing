@@ -79,8 +79,9 @@ export async function scanProject(options) {
   const startedAt = new Date().toISOString();
   try {
     const keywords = await sb.get(`tender_keywords?project_id=eq.${project.id}&is_active=eq.true&order=created_at.asc`);
-    const words = (keywords || []).map(k => k.keyword).filter(Boolean);
-    if (!words.length) throw new Error('此專案沒有啟用中的關鍵字');
+    const explicitWords = (keywords || []).map(k => k.keyword).filter(Boolean);
+    const words = explicitWords.length ? explicitWords : inferWordsFromSearchQueries(project);
+    if (!words.length) throw new Error(project.scan_mode === '主動找案' ? '此主動找案專案沒有關鍵字或搜尋指令' : '此專案沒有啟用中的關鍵字');
 
     const candidates = new Map();
     let checkedPages = 0;
@@ -297,6 +298,21 @@ function activeSearchQueries(project, words) {
     for (const intent of intents) queries.push(`${word} ${intent}`);
   }
   return queries.slice(0, 12);
+}
+
+function inferWordsFromSearchQueries(project) {
+  const queries = Array.isArray(project.search_queries) ? project.search_queries : [];
+  const stopTerms = new Set(['招標', '採購', '公開招標', '投標', '投標截止', '截止', '開標', '公告', '標案', '報價', '徵求', '案']);
+  const words = [];
+  for (const query of queries) {
+    const parts = String(query || '').split(/[\s,，、+]+/).map(s => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      if (stopTerms.has(part)) continue;
+      if (part.length < 2) continue;
+      words.push(part);
+    }
+  }
+  return [...new Set(words)].slice(0, 12);
 }
 
 function extractSearchResultLinks(html, baseUrl) {
