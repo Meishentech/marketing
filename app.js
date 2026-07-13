@@ -3245,7 +3245,7 @@ async function scanTenderProject(id){
     const sd = data.searchDiagnostics || {};
     const searchedQueries = sd.queries?.slice(0, 5).join('、');
     const diagnosticText = sd.source
-      ? `\nGoogle 候選：${data.checkedPages || 0} 筆｜原始回傳：${sd.returned || 0} 筆｜Total：${sd.totalResults || 0}${sd.errors?.length ? `\n錯誤：${sd.errors.slice(0, 3).join('、')}` : ''}`
+      ? `\n搜尋來源：${sd.source}\n搜尋候選：${data.checkedPages || 0} 筆｜原始回傳：${sd.returned || 0} 筆｜來源總數：${sd.totalResults || 0}${sd.errors?.length ? `\n錯誤：${sd.errors.slice(0, 3).join('、')}` : ''}`
       : '';
     alert(data.preservedExistingResults
       ? `掃描完成：本次主動找案未回傳新結果，已保留既有結果。${diagnosticText}${searchedQueries ? `\n查詢：${searchedQueries}` : ''}`

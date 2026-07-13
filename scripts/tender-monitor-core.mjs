@@ -91,10 +91,7 @@ export async function scanProject(options) {
     if (project.scan_mode === '主動找案') {
       const googleSearchApiKey = options.googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY');
       const googleSearchCx = options.googleSearchCx || envVar('GOOGLE_SEARCH_CX');
-      if (!googleSearchApiKey || !googleSearchCx) {
-        throw new Error('主動找案尚未啟用穩定搜尋，請在 Cloudflare 設定 GOOGLE_SEARCH_API_KEY 與 GOOGLE_SEARCH_CX');
-      }
-      searchDiagnostics = { source: 'Google 搜尋', queries: [], returned: 0, totalResults: 0, errors: [] };
+      searchDiagnostics = { source: '政府採購網', queries: [], returned: 0, totalResults: 0, errors: [] };
       for (const item of await activeSearchCandidates({
         project,
         words,
@@ -299,16 +296,173 @@ export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
 }
 
 async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT, googleSearchApiKey, googleSearchCx, diagnostics }) {
+  const rows = [];
+  for (const item of await pccTenderCandidates({
+    project,
+    words,
+    maxCandidates,
+    requestLimit,
+    diagnostics
+  })) {
+    rows.push(item);
+    if (rows.length >= maxCandidates) return dedupeCandidates(rows).slice(0, maxCandidates);
+  }
+
+  if (!googleSearchApiKey || !googleSearchCx) return dedupeCandidates(rows).slice(0, maxCandidates);
   const queries = activeSearchQueryPlan(activeSearchQueries(project, words));
-  const googleRows = await googleSearchCandidates({
+  for (const item of await googleSearchCandidates({
     queries,
     maxCandidates,
     requestLimit,
     apiKey: googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY'),
     cx: googleSearchCx || envVar('GOOGLE_SEARCH_CX'),
     diagnostics
-  });
-  return googleRows;
+  })) {
+    rows.push(item);
+    if (rows.length >= maxCandidates) break;
+  }
+  return dedupeCandidates(rows).slice(0, maxCandidates);
+}
+
+async function pccTenderCandidates({ project, words, maxCandidates, requestLimit, diagnostics }) {
+  const terms = pccSearchTerms(project, words);
+  const candidates = [];
+  let requestCount = 0;
+  for (const term of terms) {
+    if (candidates.length >= maxCandidates) break;
+    if (requestCount >= requestLimit) break;
+    diagnostics?.queries.push(`政府採購網:${term}`);
+    const url = pccTenderSearchUrl(term);
+    requestCount++;
+    let html = '';
+    try { html = await fetchHtml(url); }
+    catch (err) {
+      diagnostics?.errors.push(`政府採購網讀取失敗：${String(err.message || err).slice(0, 80)}`);
+      continue;
+    }
+    const rows = parsePccTenderRows(html, url, term);
+    diagnostics.returned += rows.length;
+    diagnostics.totalResults += rows.length;
+    for (const row of rows) {
+      candidates.push(row);
+      if (candidates.length >= maxCandidates) break;
+    }
+  }
+  return candidates;
+}
+
+function pccTenderSearchUrl(term) {
+  const { start, end } = pccDateRange();
+  const url = new URL('https://web.pcc.gov.tw/prkms/tender/common/basic/readTenderBasic');
+  Object.entries({
+    pageSize: '50',
+    firstSearch: 'true',
+    searchType: 'basic',
+    isBinding: 'N',
+    isLogIn: 'N',
+    level_22: 'on',
+    orgName: '',
+    orgId: '',
+    tenderName: term,
+    tenderId: '',
+    tenderType: 'TENDER_DECLARATION',
+    tenderWay: 'TENDER_WAY_ALL_DECLARATION',
+    dateType: 'isDate',
+    tenderStartDate: start,
+    tenderEndDate: end,
+    radProctrgCate: '',
+    policyAdvocacy: ''
+  }).forEach(([key, value]) => url.searchParams.set(key, value));
+  return url.toString();
+}
+
+function pccDateRange() {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 180);
+  return { start: formatRocDate(start), end: formatRocDate(end) };
+}
+
+function formatRocDate(date) {
+  const year = date.getFullYear() - 1911;
+  return `${year}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function pccSearchTerms(project, words = []) {
+  const fromQueries = [];
+  for (const query of Array.isArray(project.search_queries) ? project.search_queries : []) {
+    for (const part of String(query || '').split(/[\s,，、+|｜/]+/)) {
+      const term = part.trim();
+      if (term && !PCC_STOP_TERMS.has(term) && term.length >= 2) fromQueries.push(term);
+    }
+  }
+  const terms = [
+    ...words,
+    ...fromQueries,
+    '冰水主機',
+    '冰水機',
+    '空調',
+    '中央空調',
+    '汰換',
+    '替換',
+    '通風設備',
+    '磁浮'
+  ];
+  return prioritizePccTerms([...new Set(terms.map(t => cleanText(t)).filter(Boolean))]).slice(0, 12);
+}
+
+const PCC_STOP_TERMS = new Set(['招標', '採購', '公開招標', '投標', '投標中', '公告', '報價', '截止', '開標']);
+
+function prioritizePccTerms(terms) {
+  const priority = ['冰水主機', '冰水機', '汰換', '替換', '中央空調', '空調', '通風設備', '磁浮', '磁懸浮'];
+  return [...terms].sort((a, b) => pccTermScore(b, priority) - pccTermScore(a, priority));
+}
+
+function pccTermScore(term, priority) {
+  let score = 0;
+  priority.forEach((p, index) => { if (term.includes(p)) score += 100 - index; });
+  if (term.length <= 2) score -= 20;
+  return score;
+}
+
+function parsePccTenderRows(html, baseUrl, query) {
+  const table = html.match(/<table\b[^>]*id=["']tpam["'][\s\S]*?<\/table>/i)?.[0] || '';
+  if (!table || /無符合條件資料/.test(table)) return [];
+  const rows = [];
+  const rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+  while ((rowMatch = rowRe.exec(table))) {
+    const cells = [...rowMatch[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m => m[1]);
+    if (cells.length < 8) continue;
+    const linkMatch = cells[2]?.match(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+    if (!linkMatch) continue;
+    const url = normalizeCandidateUrl(new URL(decodeHtml(linkMatch[1]), baseUrl).toString());
+    const title = cleanText(htmlToText(linkMatch[2]) || htmlToText(cells[2]));
+    const org = cleanText(htmlToText(cells[1]));
+    const tenderNo = cleanText(htmlToText(cells[2]).replace(title, ''));
+    const tenderWay = cleanText(htmlToText(cells[4]));
+    const procurementType = cleanText(htmlToText(cells[5]));
+    const published = cleanText(htmlToText(cells[6]));
+    const deadline = cleanText(htmlToText(cells[7]));
+    const budget = cleanText(htmlToText(cells[8] || ''));
+    rows.push({
+      title,
+      url,
+      pageText: cleanText([
+        '政府電子採購網',
+        `查詢:${query}`,
+        org,
+        tenderNo,
+        title,
+        tenderWay,
+        procurementType,
+        `公告日期:${published}`,
+        `截止日期:${deadline}`,
+        budget
+      ].join(' '))
+    });
+  }
+  return rows;
 }
 
 async function googleSearchCandidates({ queries, maxCandidates, requestLimit, apiKey, cx, diagnostics }) {
@@ -319,7 +473,7 @@ async function googleSearchCandidates({ queries, maxCandidates, requestLimit, ap
   for (const query of queries) {
     if (candidates.length >= maxCandidates) break;
     if (requestCount >= requestLimit) break;
-    diagnostics?.queries.push(query);
+    diagnostics?.queries.push(`Google:${query}`);
     const url = new URL('https://www.googleapis.com/customsearch/v1');
     url.searchParams.set('key', apiKey);
     url.searchParams.set('cx', cx);
@@ -530,8 +684,8 @@ function activeSearchEmptyStatus(checkedPages, diagnostics) {
   const returned = diagnostics?.returned || 0;
   const totalResults = diagnostics?.totalResults || 0;
   const errors = diagnostics?.errors?.length ? `；錯誤：${diagnostics.errors.slice(0, 3).join('、')}` : '';
-  if (!checkedPages) return `成功：Google 搜尋回傳 0 筆候選，已保留既有結果｜查詢：${queries}｜Google total ${totalResults}${errors}`;
-  return `成功：Google 回傳 ${checkedPages} 筆候選，過濾後 0 筆，已保留既有結果｜查詢：${queries}｜原始回傳 ${returned} 筆｜Google total ${totalResults}${errors}`;
+  if (!checkedPages) return `成功：主動找案回傳 0 筆候選，已保留既有結果｜查詢：${queries}｜來源總數 ${totalResults}${errors}`;
+  return `成功：主動找案回傳 ${checkedPages} 筆候選，過濾後 0 筆，已保留既有結果｜查詢：${queries}｜原始回傳 ${returned} 筆｜來源總數 ${totalResults}${errors}`;
 }
 
 async function saveTenderResult(sb, method, path, payload) {
