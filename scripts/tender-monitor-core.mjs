@@ -92,7 +92,9 @@ export async function scanProject(options) {
         project,
         words,
         maxCandidates: options.maxCandidates || 30,
-        requestLimit: options.activeSearchRequestLimit || ACTIVE_SEARCH_REQUEST_LIMIT
+        requestLimit: options.activeSearchRequestLimit || ACTIVE_SEARCH_REQUEST_LIMIT,
+        googleSearchApiKey: options.googleSearchApiKey,
+        googleSearchCx: options.googleSearchCx
       })) {
         if (!candidates.has(item.url)) candidates.set(item.url, item);
       }
@@ -280,27 +282,73 @@ export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
   return candidates;
 }
 
-async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT }) {
-  const queries = activeSearchQueries(project, words);
+async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT, googleSearchApiKey, googleSearchCx }) {
+  const queries = activeSearchQueryPlan(activeSearchQueries(project, words));
+  const googleRows = await googleSearchCandidates({
+    queries,
+    maxCandidates,
+    requestLimit,
+    apiKey: googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY'),
+    cx: googleSearchCx || envVar('GOOGLE_SEARCH_CX')
+  });
+  if (googleRows.length) return googleRows;
+
+  const seen = new Set();
+  const candidates = [];
+  let requestCount = 0;
+  for (const searchQuery of queries) {
+    if (candidates.length >= maxCandidates) break;
+    if (requestCount >= requestLimit) return candidates;
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
+    let html = '';
+    requestCount++;
+    try { html = await fetchHtml(url); }
+    catch { continue; }
+    for (const item of extractSearchResultLinks(html, url)) {
+      if (candidates.length >= maxCandidates) break;
+      if (seen.has(item.url)) continue;
+      seen.add(item.url);
+      candidates.push(item);
+    }
+  }
+  return candidates;
+}
+
+async function googleSearchCandidates({ queries, maxCandidates, requestLimit, apiKey, cx }) {
+  if (!apiKey || !cx) return [];
   const seen = new Set();
   const candidates = [];
   let requestCount = 0;
   for (const query of queries) {
     if (candidates.length >= maxCandidates) break;
-    for (const searchQuery of activeSearchQueryVariants(query)) {
+    if (requestCount >= requestLimit) break;
+    const url = new URL('https://www.googleapis.com/customsearch/v1');
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('cx', cx);
+    url.searchParams.set('q', query);
+    url.searchParams.set('num', '10');
+    requestCount++;
+    let data;
+    try {
+      const res = await fetch(url.toString(), { headers: DEFAULT_HEADERS });
+      if (!res.ok) continue;
+      data = await res.json();
+    } catch {
+      continue;
+    }
+    for (const item of data.items || []) {
       if (candidates.length >= maxCandidates) break;
-      if (requestCount >= requestLimit) return candidates;
-      const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
-      let html = '';
-      requestCount++;
-      try { html = await fetchHtml(url); }
-      catch { continue; }
-      for (const item of extractSearchResultLinks(html, url)) {
-        if (candidates.length >= maxCandidates) break;
-        if (seen.has(item.url)) continue;
-        seen.add(item.url);
-        candidates.push(item);
-      }
+      const link = String(item.link || '').trim();
+      if (!link || !/^https?:\/\//i.test(link)) continue;
+      if (/\.(jpg|jpeg|png|gif|webp|svg|zip|rar|css|js|ico)(\?|$)/i.test(link)) continue;
+      const normalized = normalizeCandidateUrl(link);
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      candidates.push({
+        title: cleanText(item.title || normalized),
+        url: normalized,
+        pageText: cleanText(`${item.title || ''} ${item.snippet || ''} ${item.displayLink || ''}`)
+      });
     }
   }
   return candidates;
@@ -308,7 +356,7 @@ async function activeSearchCandidates({ project, words, maxCandidates = 30, requ
 
 function activeSearchQueries(project, words) {
   const custom = Array.isArray(project.search_queries) ? project.search_queries.map(q => String(q || '').trim()).filter(Boolean) : [];
-  if (custom.length) return custom.slice(0, 12);
+  if (custom.length) return prioritizeActiveSearchQueries(custom, words).slice(0, 12);
   const priorityWords = (words || []).slice(0, 8);
   const intents = ['招標', '採購', '公開招標', '投標截止'];
   const queries = [];
@@ -318,6 +366,31 @@ function activeSearchQueries(project, words) {
   return queries.slice(0, 12);
 }
 
+function prioritizeActiveSearchQueries(queries, words = []) {
+  const businessTerms = [...new Set([...(words || []), '冰水', '冰水主機', '冰水機', '空調', '中央空調', '通風', '磁浮', '磁懸浮', '汰換'])].filter(Boolean);
+  return [...queries].sort((a, b) => activeQueryScore(b, businessTerms) - activeQueryScore(a, businessTerms));
+}
+
+function activeQueryScore(query, terms) {
+  const text = String(query || '');
+  let score = 0;
+  for (const term of terms) if (text.includes(term)) score += 10;
+  if (/招標|採購|投標|公告|報價/.test(text)) score += 3;
+  if (/^\s*(招標|採購|投標|投標中|公告)\s*$/i.test(text.replace(/[|｜/、]/g, ''))) score -= 20;
+  return score;
+}
+
+function activeSearchQueryPlan(queries) {
+  const baseQueries = [...new Set((queries || []).map(q => String(q || '').trim()).filter(Boolean))];
+  const variants = [];
+  for (const query of baseQueries) {
+    for (const variant of activeSearchQueryVariants(query)) {
+      if (variant !== query && !baseQueries.includes(variant)) variants.push(variant);
+    }
+  }
+  return [...baseQueries, ...new Set(variants)];
+}
+
 function activeSearchQueryVariants(query) {
   const base = String(query || '').trim();
   if (!base) return [];
@@ -325,7 +398,7 @@ function activeSearchQueryVariants(query) {
   const rocYear = year - 1911;
   const variants = [base];
   if (!base.includes(String(year)) && !base.includes(String(rocYear))) {
-    variants.unshift(`${base} ${year}`);
+    variants.push(`${base} ${year}`);
     variants.push(`${base} ${rocYear}年`);
   }
   return variants;
