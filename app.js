@@ -563,10 +563,10 @@ function _renderCampaignsBody(){
   const ordered = sortCampaignsManual(CAMPAIGNS);
   const rows = ordered.map((c, i) => `
     <tr onclick="campaignDetail('${c.id}')">
-      <td class="narrow" onclick="event.stopPropagation()">
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-outline btn-sm" onclick="moveCampaignSort('${c.id}', -1)" ${i === 0 || !campaignSortColumnReady ? 'disabled' : ''}>上</button>
-          <button class="btn btn-outline btn-sm" onclick="moveCampaignSort('${c.id}', 1)" ${i === ordered.length - 1 || !campaignSortColumnReady ? 'disabled' : ''}>下</button>
+      <td class="order-col" onclick="event.stopPropagation()">
+        <div class="campaign-order">
+          <button class="btn btn-outline campaign-order-btn" title="往上移" aria-label="往上移" onclick="moveCampaignSort('${c.id}', -1)" ${i === 0 || !campaignSortColumnReady ? 'disabled' : ''}>▲</button>
+          <button class="btn btn-outline campaign-order-btn" title="往下移" aria-label="往下移" onclick="moveCampaignSort('${c.id}', 1)" ${i === ordered.length - 1 || !campaignSortColumnReady ? 'disabled' : ''}>▼</button>
         </div>
       </td>
       <td class="tb-name">${esc(c.name)}${c.association_id ? `<div class="cell-sub">${esc(assocName(c.association_id))}${c.association_activity_type ? `｜${esc(c.association_activity_type)}` : ''}</div>` : ''}</td>
@@ -596,8 +596,8 @@ function _renderCampaignsBody(){
     </div>
     ${sortNotice}
     <div id="campaign-list" style="${isGantt ? 'display:none' : ''}" class="tw">
-      <table>
-        <thead><tr><th class="narrow">排序</th><th>專案名稱 / 關聯公會</th><th>執行狀態</th><th>重要性</th><th>預算</th></tr></thead>
+      <table class="campaign-table">
+        <thead><tr><th class="order-col">排序</th><th>專案名稱 / 關聯公會</th><th>執行狀態</th><th>重要性</th><th>預算</th></tr></thead>
         <tbody>${rows || ''}</tbody>
       </table>
       ${rows ? '' : '<div class="empty">尚無行銷案</div>'}
