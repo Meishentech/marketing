@@ -24,6 +24,8 @@ export async function onRequestPost(context) {
       apiKey: anonKey,
       authToken: auth,
       projectId,
+      fetchDetails: false,
+      notify: false,
       resendApiKey: context.env.RESEND_API_KEY,
       notificationFrom: context.env.TENDER_NOTIFICATION_FROM,
       notificationTo: context.env.TENDER_NOTIFICATION_TO

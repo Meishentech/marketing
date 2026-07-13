@@ -5,6 +5,20 @@ const fd  = s => s ? s.slice(5).replace('-', '/') : '';
 const fdFull = s => s ? s.replace(/-/g, '/') : '未填';
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const safeDownloadName = (name, ext = 'png') => `${(name || 'download').replace(/[\\/:*?"<>|]+/g, '_')}.${ext}`;
+function fmtTaipeiDateTime(s){
+  if (!s) return '-';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return '-';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(d).map(p => [p.type, p.value]));
+  return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
 
 // 狀態沿用冷媒循環的溫度隱喻：預計規劃＝尚未升溫（灰），估價中＝尚未啟動（黃銅），進行中＝正在冷卻（冷媒藍綠），補助申請＝行政作業（鋼藍），結案＝完全冷卻（深藍綠）
 const STATUS_ORDER = ['預計規劃', '估價中', '進行中', '補助申請', '結案'];
@@ -2926,15 +2940,17 @@ function _renderTendersBody(){
       </td>
       <td>${(r.matched_keywords || []).map(k => `<span class="case-tag">${esc(k)}</span>`).join(' ')}</td>
       <td class="mono">${fdFull(r.published_at)}</td>
-      <td class="mono">${r.last_seen_at ? r.last_seen_at.slice(0, 16).replace('T', ' ') : '-'}</td>
+      <td class="mono">${fmtTaipeiDateTime(r.last_seen_at)}</td>
       <td>${tenderStatusSelect(r)}</td>
     </tr>`).join('');
 
-  const runRows = (selected ? TENDER_RUNS.filter(r => r.project_id === selected.id) : []).slice(0, 5).map(r => `
-    <div class="dash-item">
-      <div><div class="dash-item-title">${r.status === 'success' ? '掃描成功' : r.status === 'failed' ? '掃描失敗' : '掃描中'}</div><div class="dash-item-sub">${esc(r.error_message || `檢查 ${r.checked_pages} 頁，命中 ${r.found_count} 筆，新發現 ${r.new_count} 筆`)}</div></div>
-      <span class="mono">${r.started_at ? r.started_at.slice(5, 16).replace('T', ' ') : '-'}</span>
-    </div>`).join('') || '<div class="empty">尚無掃描紀錄</div>';
+  const runRows = (selected ? TENDER_RUNS.filter(r => r.project_id === selected.id) : []).slice(0, 5).map(r => {
+    const meta = tenderRunMeta(r);
+    return `<div class="dash-item">
+      <div><div class="dash-item-title">${esc(meta.title)}</div><div class="dash-item-sub">${esc(meta.message)}</div></div>
+      <span class="mono">${fmtTaipeiDateTime(r.started_at)}</span>
+    </div>`;
+  }).join('') || '<div class="empty">尚無掃描紀錄</div>';
 
   document.getElementById('vc').innerHTML = `
     <div class="ph">
@@ -2945,7 +2961,7 @@ function _renderTendersBody(){
       <div class="stat-box"><div class="kpi-label">監測專案</div><div class="stat-num mono">${TENDER_PROJECTS.length}</div></div>
       <div class="stat-box"><div class="kpi-label">啟用關鍵字</div><div class="stat-num mono">${TENDER_KEYWORDS.filter(k => k.is_active).length}</div></div>
       <div class="stat-box"><div class="kpi-label">未讀命中</div><div class="stat-num mono">${TENDER_RESULTS.filter(r => r.status === '未讀').length}</div></div>
-      <div class="stat-box"><div class="kpi-label">最後掃描</div><div class="stat-num mono" style="font-size:18px">${selected?.last_scanned_at ? selected.last_scanned_at.slice(5, 16).replace('T', ' ') : '-'}</div></div>
+      <div class="stat-box"><div class="kpi-label">最後掃描</div><div class="stat-num mono" style="font-size:18px">${fmtTaipeiDateTime(selected?.last_scanned_at)}</div></div>
     </div>
     <div class="tender-layout">
       <div class="card dash-panel">
@@ -2998,6 +3014,17 @@ function tenderProjectDetail(project, keywordRows, resultRows, runRows){
 
 function tenderLatestRun(projectId){
   return TENDER_RUNS.filter(r => r.project_id === projectId).sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0))[0] || null;
+}
+
+function tenderRunMeta(r){
+  const message = r.error_message || `檢查 ${r.checked_pages} 頁，命中 ${r.found_count} 筆，新發現 ${r.new_count} 筆`;
+  if (r.status === 'success') return { title: '掃描成功', message };
+  if (r.status === 'failed') return { title: '掃描失敗', message };
+  const started = new Date(r.started_at || 0);
+  if (Date.now() - started.getTime() > 3 * 60 * 1000) {
+    return { title: '掃描未完成', message: '前次手動掃描可能逾時，請重新整理後再掃描一次。' };
+  }
+  return { title: '掃描中', message };
 }
 
 function tenderStatusSelect(row){

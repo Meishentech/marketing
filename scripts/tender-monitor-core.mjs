@@ -66,8 +66,10 @@ export async function scanProject(options) {
     const matchedRows = [];
     for (const item of candidates.values()) {
       let detailHtml = '';
-      try { detailHtml = await fetchHtml(item.url); }
-      catch { detailHtml = ''; }
+      if (options.fetchDetails !== false) {
+        try { detailHtml = await fetchHtml(item.url); }
+        catch { detailHtml = ''; }
+      }
 
       const detailText = htmlToText(detailHtml);
       const title = cleanText(extractTitle(detailHtml) || item.title);
