@@ -56,7 +56,7 @@ export async function scanProject(options) {
     const candidates = new Map();
     for (const pageUrl of pages) {
       const html = await fetchHtml(pageUrl);
-      for (const item of extractTenderLinks(html, pageUrl)) {
+      for (const item of extractScanCandidates(html, pageUrl, options.maxCandidates || 80)) {
         if (!candidates.has(item.url)) candidates.set(item.url, item);
       }
     }
@@ -73,7 +73,7 @@ export async function scanProject(options) {
 
       const detailText = htmlToText(detailHtml);
       const title = cleanText(extractTitle(detailHtml) || item.title);
-      const haystack = `${title}\n${detailText}`;
+      const haystack = `${title}\n${item.pageText || ''}\n${detailText}`;
       const matchedKeywords = words.filter(w => haystack.includes(w));
       if (!matchedKeywords.length) continue;
 
@@ -179,6 +179,45 @@ export function extractTenderLinks(html, baseUrl) {
     if (title) links.push({ title, url });
   }
   return links;
+}
+
+export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
+  const tenderLinks = extractTenderLinks(html, baseUrl);
+  if (tenderLinks.length) return tenderLinks;
+
+  const base = new URL(baseUrl);
+  const seen = new Set();
+  const candidates = [{
+    title: cleanText(extractTitle(html) || base.hostname),
+    url: base.toString(),
+    pageText: htmlToText(html)
+  }];
+  seen.add(normalizeCandidateUrl(base.toString()));
+
+  const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = re.exec(html)) && candidates.length < maxLinks) {
+    const href = decodeHtml(m[1]).trim();
+    if (!href || /^(#|javascript:|mailto:|tel:)/i.test(href)) continue;
+    let url;
+    try { url = new URL(href, baseUrl); }
+    catch { continue; }
+    if (url.hostname !== base.hostname) continue;
+    if (/\.(jpg|jpeg|png|gif|webp|svg|pdf|zip|rar|css|js|ico)(\?|$)/i.test(url.pathname)) continue;
+    const normalized = normalizeCandidateUrl(url.toString());
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    const titleAttr = m[0].match(/\btitle=["']([^"']+)["']/i)?.[1];
+    const title = cleanText(decodeHtml(titleAttr || htmlToText(m[2])) || url.pathname);
+    if (title) candidates.push({ title, url: normalized });
+  }
+  return candidates;
+}
+
+function normalizeCandidateUrl(rawUrl) {
+  const url = new URL(rawUrl);
+  url.hash = '';
+  return url.toString();
 }
 
 function extractTitle(html) {
