@@ -3247,7 +3247,10 @@ async function scanTenderProject(id){
       : `掃描完成：命中 ${data.foundCount} 筆，新發現 ${data.newCount} 筆`);
     await renderTendersPage();
   } catch (e) {
-    alert(`掃描失敗：${e.message}\n請確認已登入平台，且已執行投標工具 SQL。`);
+    const hint = /GOOGLE_SEARCH_API_KEY|GOOGLE_SEARCH_CX|穩定搜尋/.test(e.message)
+      ? '請先在 Cloudflare 設定 Google 搜尋 API，主動找案才能穩定搜尋。'
+      : '請確認已登入平台，且已執行投標工具 SQL。';
+    alert(`掃描失敗：${e.message}\n${hint}`);
   }
 }
 

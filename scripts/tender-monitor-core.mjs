@@ -88,13 +88,18 @@ export async function scanProject(options) {
     const candidates = new Map();
     let checkedPages = 0;
     if (project.scan_mode === '主動找案') {
+      const googleSearchApiKey = options.googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY');
+      const googleSearchCx = options.googleSearchCx || envVar('GOOGLE_SEARCH_CX');
+      if (!googleSearchApiKey || !googleSearchCx) {
+        throw new Error('主動找案尚未啟用穩定搜尋，請在 Cloudflare 設定 GOOGLE_SEARCH_API_KEY 與 GOOGLE_SEARCH_CX');
+      }
       for (const item of await activeSearchCandidates({
         project,
         words,
         maxCandidates: options.maxCandidates || 30,
         requestLimit: options.activeSearchRequestLimit || ACTIVE_SEARCH_REQUEST_LIMIT,
-        googleSearchApiKey: options.googleSearchApiKey,
-        googleSearchCx: options.googleSearchCx
+        googleSearchApiKey,
+        googleSearchCx
       })) {
         if (!candidates.has(item.url)) candidates.set(item.url, item);
       }
@@ -291,27 +296,7 @@ async function activeSearchCandidates({ project, words, maxCandidates = 30, requ
     apiKey: googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY'),
     cx: googleSearchCx || envVar('GOOGLE_SEARCH_CX')
   });
-  if (googleRows.length) return googleRows;
-
-  const seen = new Set();
-  const candidates = [];
-  let requestCount = 0;
-  for (const searchQuery of queries) {
-    if (candidates.length >= maxCandidates) break;
-    if (requestCount >= requestLimit) return candidates;
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
-    let html = '';
-    requestCount++;
-    try { html = await fetchHtml(url); }
-    catch { continue; }
-    for (const item of extractSearchResultLinks(html, url)) {
-      if (candidates.length >= maxCandidates) break;
-      if (seen.has(item.url)) continue;
-      seen.add(item.url);
-      candidates.push(item);
-    }
-  }
-  return candidates;
+  return googleRows;
 }
 
 async function googleSearchCandidates({ queries, maxCandidates, requestLimit, apiKey, cx }) {
