@@ -1,0 +1,22 @@
+name: Tender monitor
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 08:00 台北時間（UTC+8）
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/monitor-tenders.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TENDER_NOTIFICATION_FROM: ${{ secrets.TENDER_NOTIFICATION_FROM }}
+          TENDER_NOTIFICATION_TO: ${{ secrets.TENDER_NOTIFICATION_TO }}

@@ -31,6 +31,8 @@ const CAMPAIGN_ASSOC_ACTIVITY_OPTIONS = ['會員大會', '協辦活動', '技術
 const CUSTOM_OPTION_VALUE = '__custom_option__';
 const NEW_CAMPAIGN_VALUE = '__new_campaign__';
 const CAMPAIGN_SORT_SQL_FILE = 'schema_v22_campaign_manual_sort.sql';
+const TENDER_SQL_FILE = 'schema_v23_tender_monitor.sql';
+const TENDER_STATUS_OPTIONS = ['未讀', '評估中', '已追蹤', '已排除'];
 
 function sortByStatus(list){
   return [...list].sort((a, b) => {
@@ -50,6 +52,18 @@ function sortCampaignsManual(list){
     const br = campaignSortRank(b, Number.MAX_SAFE_INTEGER);
     if (ar !== br) return ar - br;
     return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+}
+function tenderSortRank(p, fallback){
+  const n = Number(p?.sort_order);
+  return Number.isFinite(n) ? n : fallback;
+}
+function sortTenderProjects(list){
+  return [...list].sort((a, b) => {
+    const ar = tenderSortRank(a, Number.MAX_SAFE_INTEGER);
+    const br = tenderSortRank(b, Number.MAX_SAFE_INTEGER);
+    if (ar !== br) return ar - br;
+    return new Date(a.created_at || 0) - new Date(b.created_at || 0);
   });
 }
 
@@ -72,6 +86,10 @@ let ASSOC_EVENTS = [];
 let ASSOC_NOTES = [];
 let ASSOC_TASKS = [];
 let ASSOC_EXPENSES = [];
+let TENDER_PROJECTS = [];
+let TENDER_KEYWORDS = [];
+let TENDER_RESULTS = [];
+let TENDER_RUNS = [];
 let CAMPAIGN_TASKS_ALL = [];
 let CAMPAIGN_BUDGET_ITEMS_ALL = [];
 let RESOURCE_FILTERS = { q: '', type: '', audience: '', external: '', sort: 'updated' };
@@ -95,6 +113,8 @@ let editAssocEventId = null;
 let editAssocNoteId = null;
 let editAssocTaskId = null;
 let editAssocExpenseId = null;
+let editTenderProjectId = null;
+let selectedTenderProjectId = null;
 let quickRiskId = null;
 let editRiskUpdateId = null;
 let detailCampaignId = null;
@@ -118,6 +138,7 @@ async function nav(view){
   if (view === 'dashboard') await renderDashboard();
   else if (view === 'campaigns') await renderCampaignsPage();
   else if (view === 'subsidies') await renderSubsidiesPage();
+  else if (view === 'tenders') await renderTendersPage();
   else if (view === 'drafts') await renderDraftsPage();
   else if (view === 'news') await renderNewsPage();
   else if (view === 'cases') await renderCasesPage();
@@ -2831,6 +2852,274 @@ function exportCampaignsCSV(){
   a.href = url; a.download = `行銷案清單_${todayISO()}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+}
+
+// ── 投標工具 ──
+async function renderTendersPage(){
+  document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
+  try {
+    const [projects, keywords, results, runs] = await Promise.all([
+      GET('tender_projects?order=sort_order.asc,created_at.asc'),
+      GET('tender_keywords?order=created_at.asc'),
+      GET('tender_results?order=last_seen_at.desc'),
+      GET('tender_scan_runs?order=started_at.desc')
+    ]);
+    TENDER_PROJECTS = sortTenderProjects(projects || []);
+    TENDER_KEYWORDS = keywords || [];
+    TENDER_RESULTS = results || [];
+    TENDER_RUNS = runs || [];
+    if (!selectedTenderProjectId || !TENDER_PROJECTS.some(p => p.id === selectedTenderProjectId)) {
+      selectedTenderProjectId = TENDER_PROJECTS[0]?.id || null;
+    }
+    _renderTendersBody();
+  } catch (e) {
+    document.getElementById('vc').innerHTML = `
+      <div class="ph"><div><div class="pt">投標工具</div><div class="ps">每日 08:00 監測招標公告與採購訊息</div></div></div>
+      <div class="card">
+        <div class="dash-panel-head">
+          <div>
+            <div class="dash-panel-title">尚未啟用投標工具資料表</div>
+            <div class="muted-text">請先在 Supabase SQL editor 執行 ${TENDER_SQL_FILE}，再回到此頁使用。</div>
+          </div>
+          <a class="btn btn-outline btn-sm" href="?sql=${TENDER_SQL_FILE}" target="_blank" rel="noopener">查看 SQL</a>
+        </div>
+      </div>`;
+  }
+}
+
+function _renderTendersBody(){
+  const selected = TENDER_PROJECTS.find(p => p.id === selectedTenderProjectId) || null;
+  const projectRows = TENDER_PROJECTS.map((p, i) => {
+    const run = tenderLatestRun(p.id);
+    const hitCount = TENDER_RESULTS.filter(r => r.project_id === p.id).length;
+    return `<div class="rowcard ${p.id === selectedTenderProjectId ? 'st-teal' : ''}" onclick="selectTenderProject('${p.id}')">
+      <div class="row-info">
+        <div class="row-name">${esc(p.name)}</div>
+        <div class="cell-sub">${p.is_active ? '啟用' : '停用'}｜${hitCount} 筆命中｜${run ? esc(run.status) : '尚未掃描'}</div>
+      </div>
+      <div class="row-right" onclick="event.stopPropagation()">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="moveTenderProjectSort('${p.id}', -1)" ${i === 0 ? 'disabled' : ''}>上</button>
+          <button class="btn btn-outline btn-sm" onclick="moveTenderProjectSort('${p.id}', 1)" ${i === TENDER_PROJECTS.length - 1 ? 'disabled' : ''}>下</button>
+          <button class="btn btn-outline btn-sm" onclick="openTenderProjectModal('${p.id}')">編輯</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="empty">尚無投標監測專案</div>';
+
+  const projectKeywords = selected ? TENDER_KEYWORDS.filter(k => k.project_id === selected.id) : [];
+  const keywordRows = projectKeywords.map(k => `
+    <div class="dash-item">
+      <label style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" style="width:auto" ${k.is_active ? 'checked' : ''} onchange="toggleTenderKeyword('${k.id}', this.checked)">
+        <span>${esc(k.keyword)}</span>
+      </label>
+      <button class="btn btn-outline btn-sm" onclick="deleteTenderKeyword('${k.id}')">刪除</button>
+    </div>`).join('') || '<div class="empty">尚未設定關鍵字</div>';
+
+  const projectResults = selected ? TENDER_RESULTS.filter(r => r.project_id === selected.id) : [];
+  const resultRows = projectResults.map(r => `
+    <tr>
+      <td>
+        <div class="cell-main clamp2"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a></div>
+        <div class="cell-sub clamp2">${esc(r.snippet || '')}</div>
+      </td>
+      <td>${(r.matched_keywords || []).map(k => `<span class="case-tag">${esc(k)}</span>`).join(' ')}</td>
+      <td class="mono">${fdFull(r.published_at)}</td>
+      <td class="mono">${r.last_seen_at ? r.last_seen_at.slice(0, 16).replace('T', ' ') : '-'}</td>
+      <td>${tenderStatusSelect(r)}</td>
+    </tr>`).join('');
+
+  const runRows = (selected ? TENDER_RUNS.filter(r => r.project_id === selected.id) : []).slice(0, 5).map(r => `
+    <div class="dash-item">
+      <div><div class="dash-item-title">${r.status === 'success' ? '掃描成功' : r.status === 'failed' ? '掃描失敗' : '掃描中'}</div><div class="dash-item-sub">${esc(r.error_message || `檢查 ${r.checked_pages} 頁，命中 ${r.found_count} 筆，新發現 ${r.new_count} 筆`)}</div></div>
+      <span class="mono">${r.started_at ? r.started_at.slice(5, 16).replace('T', ' ') : '-'}</span>
+    </div>`).join('') || '<div class="empty">尚無掃描紀錄</div>';
+
+  document.getElementById('vc').innerHTML = `
+    <div class="ph">
+      <div><div class="pt">投標工具</div><div class="ps">每日 08:00 自動搜尋公告關鍵字，命中後保留網址、發布時間與追蹤狀態</div></div>
+      <button class="btn btn-primary" onclick="openTenderProjectModal()">＋ 新增監測專案</button>
+    </div>
+    <div class="dash-kpi-grid">
+      <div class="stat-box"><div class="kpi-label">監測專案</div><div class="stat-num mono">${TENDER_PROJECTS.length}</div></div>
+      <div class="stat-box"><div class="kpi-label">啟用關鍵字</div><div class="stat-num mono">${TENDER_KEYWORDS.filter(k => k.is_active).length}</div></div>
+      <div class="stat-box"><div class="kpi-label">未讀命中</div><div class="stat-num mono">${TENDER_RESULTS.filter(r => r.status === '未讀').length}</div></div>
+      <div class="stat-box"><div class="kpi-label">最後掃描</div><div class="stat-num mono" style="font-size:18px">${selected?.last_scanned_at ? selected.last_scanned_at.slice(5, 16).replace('T', ' ') : '-'}</div></div>
+    </div>
+    <div class="tender-layout">
+      <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="dash-panel-title">監測專案排序</div><div class="muted-text">用上 / 下調整顯示順序</div></div></div>
+        <div class="dash-list">${projectRows}</div>
+      </div>
+      <div>
+        ${selected ? tenderProjectDetail(selected, keywordRows, resultRows, runRows) : '<div class="card"><div class="empty">請先新增監測專案</div></div>'}
+      </div>
+    </div>`;
+}
+
+function tenderProjectDetail(project, keywordRows, resultRows, runRows){
+  return `
+    <div class="card dash-panel" style="margin-bottom:16px">
+      <div class="dash-panel-head">
+        <div>
+          <div class="dash-panel-title">${esc(project.name)}</div>
+          <div class="muted-text clip">${esc(project.source_url)}</div>
+          <div class="muted-text">${esc(project.last_scan_status || '尚未掃描')}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" onclick="openTenderProjectModal('${project.id}')">編輯專案</button>
+          <button class="btn btn-primary btn-sm" onclick="scanTenderProject('${project.id}')">立即掃描</button>
+        </div>
+      </div>
+    </div>
+    <div class="dash-kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-bottom:16px">
+      <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="dash-panel-title">關鍵字</div><div class="muted-text">可自行新增、停用或刪除</div></div></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="tk-keyword" placeholder="新增關鍵字，例如 冰水主機" onkeydown="if(event.key==='Enter') saveTenderKeyword()">
+          <button class="btn btn-primary btn-sm" onclick="saveTenderKeyword()">新增</button>
+        </div>
+        <div class="dash-list">${keywordRows}</div>
+      </div>
+      <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="dash-panel-title">最近掃描紀錄</div><div class="muted-text">自動與手動掃描都會記錄</div></div></div>
+        <div class="dash-list">${runRows}</div>
+      </div>
+    </div>
+    <div class="tw">
+      <table class="assoc-table">
+        <thead><tr><th>命中公告網址</th><th>關鍵字</th><th>發布時間</th><th>更新時間</th><th>狀態</th></tr></thead>
+        <tbody>${resultRows}</tbody>
+      </table>
+      ${resultRows ? '' : '<div class="empty">目前沒有命中結果</div>'}
+    </div>`;
+}
+
+function tenderLatestRun(projectId){
+  return TENDER_RUNS.filter(r => r.project_id === projectId).sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0))[0] || null;
+}
+
+function tenderStatusSelect(row){
+  return `<select onchange="updateTenderResultStatus('${row.id}', this.value)" style="min-width:92px">${TENDER_STATUS_OPTIONS.map(s => `<option ${row.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>`;
+}
+
+function selectTenderProject(id){
+  selectedTenderProjectId = id;
+  _renderTendersBody();
+}
+
+async function moveTenderProjectSort(id, direction){
+  const ordered = sortTenderProjects(TENDER_PROJECTS);
+  const index = ordered.findIndex(p => p.id === id);
+  const targetIndex = index + direction;
+  if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return;
+  const current = ordered[index];
+  const target = ordered[targetIndex];
+  const currentRank = tenderSortRank(current, (index + 1) * 1000);
+  const targetRank = tenderSortRank(target, (targetIndex + 1) * 1000);
+  await Promise.all([
+    PATCH(`tender_projects?id=eq.${current.id}`, { sort_order: targetRank, updated_at: new Date().toISOString() }),
+    PATCH(`tender_projects?id=eq.${target.id}`, { sort_order: currentRank, updated_at: new Date().toISOString() })
+  ]);
+  await renderTendersPage();
+}
+
+function openTenderProjectModal(id = null){
+  editTenderProjectId = id;
+  const p = id ? TENDER_PROJECTS.find(x => x.id === id) : null;
+  document.getElementById('tpm-title').textContent = id ? '編輯監測專案' : '新增監測專案';
+  document.getElementById('tpm-name').value = p?.name || '';
+  document.getElementById('tpm-url').value = p?.source_url || '';
+  document.getElementById('tpm-limit').value = p?.page_limit ?? 2;
+  document.getElementById('tpm-active').checked = p?.is_active !== false;
+  document.getElementById('tpm-email').value = p?.notify_email || '';
+  document.getElementById('tpm-notes').value = p?.notes || '';
+  document.getElementById('tpm-delete').style.display = id ? '' : 'none';
+  openM('mtenderproject');
+}
+
+async function saveTenderProject(){
+  const name = document.getElementById('tpm-name').value.trim();
+  const sourceUrl = document.getElementById('tpm-url').value.trim();
+  if (!name || !sourceUrl) { alert('請輸入專案名稱與網址'); return; }
+  const payload = {
+    name,
+    source_url: sourceUrl,
+    page_limit: Math.max(1, Math.min(Number(document.getElementById('tpm-limit').value) || 1, 10)),
+    is_active: document.getElementById('tpm-active').checked,
+    notify_email: document.getElementById('tpm-email').value.trim() || null,
+    notes: document.getElementById('tpm-notes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  let savedId = editTenderProjectId;
+  if (editTenderProjectId) await PATCH(`tender_projects?id=eq.${editTenderProjectId}`, payload);
+  else {
+    const lastRank = TENDER_PROJECTS.reduce((max, p) => Math.max(max, tenderSortRank(p, 0)), 0);
+    const r = await POST('tender_projects', { ...payload, sort_order: lastRank + 10 });
+    savedId = r?.[0]?.id;
+  }
+  selectedTenderProjectId = savedId;
+  closeM('mtenderproject');
+  await renderTendersPage();
+}
+
+async function deleteTenderProject(){
+  if (!editTenderProjectId || !confirm('確定刪除此監測專案？關鍵字與命中結果也會一併刪除。')) return;
+  await DEL(`tender_projects?id=eq.${editTenderProjectId}`);
+  selectedTenderProjectId = null;
+  closeM('mtenderproject');
+  await renderTendersPage();
+}
+
+async function saveTenderKeyword(){
+  const selected = TENDER_PROJECTS.find(p => p.id === selectedTenderProjectId);
+  const input = document.getElementById('tk-keyword');
+  const keyword = input.value.trim();
+  if (!selected || !keyword) return;
+  try {
+    await POST('tender_keywords', { project_id: selected.id, keyword, is_active: true });
+    input.value = '';
+    await renderTendersPage();
+  } catch (e) {
+    alert('關鍵字已存在，或資料庫尚未啟用投標工具。');
+  }
+}
+
+async function toggleTenderKeyword(id, checked){
+  await PATCH(`tender_keywords?id=eq.${id}`, { is_active: checked, updated_at: new Date().toISOString() });
+  await renderTendersPage();
+}
+
+async function deleteTenderKeyword(id){
+  if (!confirm('確定刪除此關鍵字？')) return;
+  await DEL(`tender_keywords?id=eq.${id}`);
+  await renderTendersPage();
+}
+
+async function updateTenderResultStatus(id, status){
+  await PATCH(`tender_results?id=eq.${id}`, { status, updated_at: new Date().toISOString() });
+  const row = TENDER_RESULTS.find(r => r.id === id);
+  if (row) row.status = status;
+}
+
+async function scanTenderProject(id){
+  try {
+    const res = await fetch('/api/tender-scan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionStorage.getItem('ms_token') || ''}`
+      },
+      body: JSON.stringify({ projectId: id })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `掃描失敗 ${res.status}`);
+    alert(`掃描完成：命中 ${data.foundCount} 筆，新發現 ${data.newCount} 筆`);
+    await renderTendersPage();
+  } catch (e) {
+    alert(`掃描失敗：${e.message}\n請確認 Cloudflare Pages 已設定 SUPABASE_URL、SUPABASE_ANON_KEY、SUPABASE_SERVICE_ROLE_KEY。`);
+  }
 }
 
 // ── 每週文案彙整 ──
