@@ -404,7 +404,9 @@ tbody tr:last-child td{border-bottom:none}
     <div class="mb">
       <div class="fg">
         <div class="fg1 ff"><label class="fl">專案名稱 *</label><input id="tpm-name" placeholder="例如 耕莘醫院招標公告"></div>
-        <div class="fg1 ff"><label class="fl">監測網址 *</label><input id="tpm-url" placeholder="https://..."></div>
+        <div class="fg1"><label class="fl">掃描模式</label><select id="tpm-scan-mode" onchange="updateTenderModeFields()"><option>指定網址</option><option>主動找案</option></select></div>
+        <div class="fg1 ff" id="tpm-url-wrap"><label class="fl">監測網址 *</label><input id="tpm-url" placeholder="https://..."></div>
+        <div class="fg1 ff" id="tpm-search-wrap" style="display:none"><label class="fl">搜尋指令</label><textarea id="tpm-search-queries" placeholder="每行一組，例如：&#10;冰水主機 招標&#10;中央空調 採購&#10;通風設備 投標截止"></textarea></div>
         <div class="fg1"><label class="fl">掃描頁數</label><input id="tpm-limit" type="number" min="1" max="10" value="2"></div>
         <div class="fg1"><label class="fl">篩選模式</label><select id="tpm-filter-mode"><option>保守</option><option>平衡</option><option>嚴格</option></select></div>
         <div class="fg1"><label class="fl">啟用狀態</label><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);padding-top:9px"><input id="tpm-active" type="checkbox" checked style="width:auto"> 每日 08:00 掃描</label></div>

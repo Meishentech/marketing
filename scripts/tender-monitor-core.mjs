@@ -82,12 +82,21 @@ export async function scanProject(options) {
     const words = (keywords || []).map(k => k.keyword).filter(Boolean);
     if (!words.length) throw new Error('此專案沒有啟用中的關鍵字');
 
-    const pages = projectPageUrls(project.source_url, options.pageLimitOverride || project.page_limit || 1);
     const candidates = new Map();
-    for (const pageUrl of pages) {
-      const html = await fetchHtml(pageUrl);
-      for (const item of extractScanCandidates(html, pageUrl, options.maxCandidates || 80)) {
+    let checkedPages = 0;
+    if (project.scan_mode === '主動找案') {
+      for (const item of await activeSearchCandidates({ project, words, maxCandidates: options.maxCandidates || 30 })) {
         if (!candidates.has(item.url)) candidates.set(item.url, item);
+      }
+      checkedPages = candidates.size;
+    } else {
+      const pages = projectPageUrls(project.source_url, options.pageLimitOverride || project.page_limit || 1);
+      checkedPages = pages.length;
+      for (const pageUrl of pages) {
+        const html = await fetchHtml(pageUrl);
+        for (const item of extractScanCandidates(html, pageUrl, options.maxCandidates || 80)) {
+          if (!candidates.has(item.url)) candidates.set(item.url, item);
+        }
       }
     }
 
@@ -111,7 +120,8 @@ export async function scanProject(options) {
         scanCategories: project.scan_categories,
         filterMode: project.filter_mode
       });
-      if (!matchedKeywords.length) continue;
+      if (project.scan_mode !== '主動找案' && !matchedKeywords.length) continue;
+      if (project.scan_mode === '主動找案' && !matchedKeywords.length && relevance.score < relevance.thresholds.review) continue;
 
       foundCount++;
       const publishedAt = extractPublishedDate(detailText);
@@ -143,9 +153,13 @@ export async function scanProject(options) {
       matchedRows.push({ title, url: item.url, publishedAt, matchedKeywords, snippet, relevance });
     }
 
+    if (foundCount === 0) {
+      await sb.del(`tender_results?project_id=eq.${project.id}`).catch(() => {});
+    }
+
     await sb.patch(`tender_scan_runs?id=eq.${run.id}`, {
       status: 'success',
-      checked_pages: pages.length,
+      checked_pages: checkedPages,
       found_count: foundCount,
       new_count: newCount,
       finished_at: new Date().toISOString()
@@ -162,7 +176,7 @@ export async function scanProject(options) {
       });
     }
 
-    return { projectId: project.id, checkedPages: pages.length, foundCount, newCount, matches: matchedRows };
+    return { projectId: project.id, checkedPages, foundCount, newCount, matches: matchedRows };
   } catch (err) {
     if (run?.id) {
       await sb.patch(`tender_scan_runs?id=eq.${run.id}`, {
@@ -251,6 +265,87 @@ export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
     if (title) candidates.push({ title, url: normalized });
   }
   return candidates;
+}
+
+async function activeSearchCandidates({ project, words, maxCandidates = 30 }) {
+  const queries = activeSearchQueries(project, words);
+  const seen = new Set();
+  const candidates = [];
+  for (const query of queries) {
+    if (candidates.length >= maxCandidates) break;
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    let html = '';
+    try { html = await fetchHtml(url); }
+    catch { continue; }
+    for (const item of extractSearchResultLinks(html, url)) {
+      if (candidates.length >= maxCandidates) break;
+      if (seen.has(item.url)) continue;
+      seen.add(item.url);
+      candidates.push(item);
+    }
+  }
+  return candidates;
+}
+
+function activeSearchQueries(project, words) {
+  const custom = Array.isArray(project.search_queries) ? project.search_queries.map(q => String(q || '').trim()).filter(Boolean) : [];
+  if (custom.length) return custom.slice(0, 12);
+  const priorityWords = (words || []).slice(0, 8);
+  const intents = ['招標', '採購', '公開招標', '投標截止'];
+  const queries = [];
+  for (const word of priorityWords) {
+    for (const intent of intents) queries.push(`${word} ${intent}`);
+  }
+  return queries.slice(0, 12);
+}
+
+function extractSearchResultLinks(html, baseUrl) {
+  const links = [];
+  const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const rawHref = decodeHtml(m[1]);
+    const url = normalizeSearchResultUrl(rawHref, baseUrl);
+    if (!url) continue;
+    const title = cleanText(htmlToText(m[2]));
+    if (!title || /^(圖片|影片|新聞|更多|下一頁|上一頁)$/.test(title)) continue;
+    const pageText = cleanText(`${title} ${nearbyText(html, m.index, 420)}`);
+    links.push({ title, url, pageText });
+  }
+  return dedupeCandidates(links).slice(0, 20);
+}
+
+function normalizeSearchResultUrl(rawHref, baseUrl) {
+  let url;
+  try { url = new URL(rawHref, baseUrl); }
+  catch { return ''; }
+  const uddg = url.searchParams.get('uddg');
+  if (uddg) {
+    try { url = new URL(uddg); }
+    catch { return ''; }
+  }
+  if (!/^https?:$/.test(url.protocol)) return '';
+  if (/duckduckgo\.com$/i.test(url.hostname)) return '';
+  if (/\.(jpg|jpeg|png|gif|webp|svg|pdf|zip|rar|css|js|ico)(\?|$)/i.test(url.pathname)) return '';
+  url.hash = '';
+  return url.toString();
+}
+
+function nearbyText(html, index, size) {
+  const start = Math.max(0, index);
+  return htmlToText(String(html || '').slice(start, start + size));
+}
+
+function dedupeCandidates(items) {
+  const seen = new Set();
+  const rows = [];
+  for (const item of items) {
+    const key = normalizeCandidateUrl(item.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ ...item, url: key });
+  }
+  return rows;
 }
 
 function normalizeCandidateUrl(rawUrl) {

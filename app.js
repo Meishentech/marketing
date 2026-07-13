@@ -47,6 +47,7 @@ const NEW_CAMPAIGN_VALUE = '__new_campaign__';
 const CAMPAIGN_SORT_SQL_FILE = 'schema_v22_campaign_manual_sort.sql';
 const TENDER_SQL_FILE = 'schema_v23_tender_monitor.sql';
 const TENDER_FILTER_SQL_FILE = 'schema_v24_tender_scan_filters.sql';
+const TENDER_ACTIVE_SQL_FILE = 'schema_v26_tender_active_search.sql';
 const TENDER_STATUS_OPTIONS = ['未讀', '評估中', '已追蹤', '已排除'];
 const TENDER_FILTER_MODE_OPTIONS = ['保守', '平衡', '嚴格'];
 const TENDER_SCAN_CATEGORIES = [
@@ -3006,7 +3007,7 @@ function tenderProjectDetail(project, keywordRows, resultRows, runRows){
       <div class="dash-panel-head">
         <div>
           <div class="dash-panel-title">${esc(project.name)}</div>
-          <div class="muted-text clip">${esc(project.source_url)}</div>
+          <div class="muted-text clip">${project.scan_mode === '主動找案' ? `主動找案｜${tenderSearchQueryLabel(project)}` : esc(project.source_url)}</div>
           <div class="muted-text">${esc(project.last_scan_status || '尚未掃描')}</div>
           <div class="muted-text">${esc(project.filter_mode || '保守')}模式｜${tenderCategoryLabels(project.scan_categories).join('、')}</div>
         </div>
@@ -3097,7 +3098,9 @@ function openTenderProjectModal(id = null){
   const p = id ? TENDER_PROJECTS.find(x => x.id === id) : null;
   document.getElementById('tpm-title').textContent = id ? '編輯監測專案' : '新增監測專案';
   document.getElementById('tpm-name').value = p?.name || '';
-  document.getElementById('tpm-url').value = p?.source_url || '';
+  document.getElementById('tpm-scan-mode').value = p?.scan_mode || '指定網址';
+  document.getElementById('tpm-url').value = p?.source_url?.startsWith('active-search://') ? '' : (p?.source_url || '');
+  document.getElementById('tpm-search-queries').value = Array.isArray(p?.search_queries) ? p.search_queries.join('\n') : '';
   document.getElementById('tpm-limit').value = p?.page_limit ?? 2;
   document.getElementById('tpm-filter-mode').value = p?.filter_mode || '保守';
   renderTenderCategoryChecks(p?.scan_categories);
@@ -3105,7 +3108,17 @@ function openTenderProjectModal(id = null){
   document.getElementById('tpm-email').value = p?.notify_email || '';
   document.getElementById('tpm-notes').value = p?.notes || '';
   document.getElementById('tpm-delete').style.display = id ? '' : 'none';
+  updateTenderModeFields();
   openM('mtenderproject');
+}
+
+function updateTenderModeFields(){
+  const mode = document.getElementById('tpm-scan-mode')?.value || '指定網址';
+  const isActive = mode === '主動找案';
+  const urlWrap = document.getElementById('tpm-url-wrap');
+  const searchWrap = document.getElementById('tpm-search-wrap');
+  if (urlWrap) urlWrap.style.display = isActive ? 'none' : '';
+  if (searchWrap) searchWrap.style.display = isActive ? '' : 'none';
 }
 
 function renderTenderCategoryChecks(selectedCategories){
@@ -3130,11 +3143,14 @@ function selectedTenderCategories(){
 
 async function saveTenderProject(){
   const name = document.getElementById('tpm-name').value.trim();
+  const scanMode = document.getElementById('tpm-scan-mode').value || '指定網址';
   const sourceUrl = document.getElementById('tpm-url').value.trim();
-  if (!name || !sourceUrl) { alert('請輸入專案名稱與網址'); return; }
+  if (!name || (scanMode === '指定網址' && !sourceUrl)) { alert('請輸入專案名稱與網址'); return; }
   const payload = {
     name,
-    source_url: sourceUrl,
+    scan_mode: scanMode,
+    source_url: scanMode === '主動找案' ? 'active-search://default' : sourceUrl,
+    search_queries: parseTenderSearchQueries(),
     page_limit: Math.max(1, Math.min(Number(document.getElementById('tpm-limit').value) || 1, 10)),
     filter_mode: document.getElementById('tpm-filter-mode').value || '保守',
     scan_categories: selectedTenderCategories(),
@@ -3152,12 +3168,22 @@ async function saveTenderProject(){
       savedId = r?.[0]?.id;
     }
   } catch (e) {
-    alert(`專案儲存失敗，請確認已執行 ${TENDER_FILTER_SQL_FILE}。`);
+    alert(`專案儲存失敗，請確認已執行 ${TENDER_FILTER_SQL_FILE} 與 ${TENDER_ACTIVE_SQL_FILE}。`);
     return;
   }
   selectedTenderProjectId = savedId;
   closeM('mtenderproject');
   await renderTendersPage();
+}
+
+function parseTenderSearchQueries(){
+  const raw = document.getElementById('tpm-search-queries')?.value || '';
+  return raw.split(/[\n,，]+/).map(s => s.trim()).filter(Boolean).slice(0, 12);
+}
+
+function tenderSearchQueryLabel(project){
+  const queries = Array.isArray(project.search_queries) ? project.search_queries.filter(Boolean) : [];
+  return queries.length ? `${queries.slice(0, 3).join('、')}${queries.length > 3 ? '…' : ''}` : '依關鍵字自動組合搜尋';
 }
 
 async function deleteTenderProject(){
