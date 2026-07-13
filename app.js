@@ -46,7 +46,21 @@ const CUSTOM_OPTION_VALUE = '__custom_option__';
 const NEW_CAMPAIGN_VALUE = '__new_campaign__';
 const CAMPAIGN_SORT_SQL_FILE = 'schema_v22_campaign_manual_sort.sql';
 const TENDER_SQL_FILE = 'schema_v23_tender_monitor.sql';
+const TENDER_FILTER_SQL_FILE = 'schema_v24_tender_scan_filters.sql';
 const TENDER_STATUS_OPTIONS = ['未讀', '評估中', '已追蹤', '已排除'];
+const TENDER_FILTER_MODE_OPTIONS = ['保守', '平衡', '嚴格'];
+const TENDER_SCAN_CATEGORIES = [
+  { id: 'bid_open', label: '招標 / 投標中' },
+  { id: 'procurement', label: '採購 / 報價' },
+  { id: 'deadline', label: '截止 / 開標日期' },
+  { id: 'chiller', label: '冰水主機' },
+  { id: 'central_ac', label: '中央空調 / 空調設備' },
+  { id: 'ventilation', label: '通風設備' },
+  { id: 'maglev', label: '磁浮 / 磁懸浮' },
+  { id: 'exclude_closed', label: '降低決標 / 得標' },
+  { id: 'exclude_residential', label: '降低家用冷氣' }
+];
+const DEFAULT_TENDER_SCAN_CATEGORIES = TENDER_SCAN_CATEGORIES.map(c => c.id);
 
 function sortByStatus(list){
   return [...list].sort((a, b) => {
@@ -2903,6 +2917,7 @@ async function renderTendersPage(){
 
 function _renderTendersBody(){
   const selected = TENDER_PROJECTS.find(p => p.id === selectedTenderProjectId) || null;
+  const filterColumnReady = !!selected && selected.scan_categories !== undefined && TENDER_RESULTS.every(r => r.relevance_level !== undefined);
   const projectRows = TENDER_PROJECTS.map((p, i) => {
     const run = tenderLatestRun(p.id);
     const hitCount = TENDER_RESULTS.filter(r => r.project_id === p.id).length;
@@ -2939,6 +2954,7 @@ function _renderTendersBody(){
         <div class="cell-sub clamp2">${esc(r.snippet || '')}</div>
       </td>
       <td>${(r.matched_keywords || []).map(k => `<span class="case-tag">${esc(k)}</span>`).join(' ')}</td>
+      <td>${tenderRelevanceTag(r)}</td>
       <td class="mono">${fdFull(r.published_at)}</td>
       <td class="mono">${fmtTaipeiDateTime(r.last_seen_at)}</td>
       <td>${tenderStatusSelect(r)}</td>
@@ -2957,6 +2973,16 @@ function _renderTendersBody(){
       <div><div class="pt">投標工具</div><div class="ps">每日 08:00 自動搜尋公告關鍵字，命中後保留網址、發布時間與追蹤狀態</div></div>
       <button class="btn btn-primary" onclick="openTenderProjectModal()">＋ 新增監測專案</button>
     </div>
+    ${filterColumnReady || !selected ? '' : `
+      <div class="card" style="margin-bottom:12px">
+        <div class="dash-panel-head">
+          <div>
+            <div class="dash-panel-title">尚未啟用掃描類別與關聯度分級</div>
+            <div class="muted-text">請先執行 ${TENDER_FILTER_SQL_FILE}，之後就能設定掃描類別、保守/平衡/嚴格模式與結果分級。</div>
+          </div>
+          <a class="btn btn-outline btn-sm" href="?sql=${TENDER_FILTER_SQL_FILE}" target="_blank" rel="noopener">查看 SQL</a>
+        </div>
+      </div>`}
     <div class="dash-kpi-grid">
       <div class="stat-box"><div class="kpi-label">監測專案</div><div class="stat-num mono">${TENDER_PROJECTS.length}</div></div>
       <div class="stat-box"><div class="kpi-label">啟用關鍵字</div><div class="stat-num mono">${TENDER_KEYWORDS.filter(k => k.is_active).length}</div></div>
@@ -2982,6 +3008,7 @@ function tenderProjectDetail(project, keywordRows, resultRows, runRows){
           <div class="dash-panel-title">${esc(project.name)}</div>
           <div class="muted-text clip">${esc(project.source_url)}</div>
           <div class="muted-text">${esc(project.last_scan_status || '尚未掃描')}</div>
+          <div class="muted-text">${esc(project.filter_mode || '保守')}模式｜${tenderCategoryLabels(project.scan_categories).join('、')}</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
           <button class="btn btn-outline btn-sm" onclick="openTenderProjectModal('${project.id}')">編輯專案</button>
@@ -3005,7 +3032,7 @@ function tenderProjectDetail(project, keywordRows, resultRows, runRows){
     </div>
     <div class="tw">
       <table class="assoc-table">
-        <thead><tr><th>命中公告網址</th><th>關鍵字</th><th>發布時間</th><th>更新時間</th><th>狀態</th></tr></thead>
+        <thead><tr><th>命中公告網址</th><th>關鍵字</th><th>判斷</th><th>發布時間</th><th>更新時間</th><th>狀態</th></tr></thead>
         <tbody>${resultRows}</tbody>
       </table>
       ${resultRows ? '' : '<div class="empty">目前沒有命中結果</div>'}
@@ -3029,6 +3056,19 @@ function tenderRunMeta(r){
 
 function tenderStatusSelect(row){
   return `<select onchange="updateTenderResultStatus('${row.id}', this.value)" style="min-width:92px">${TENDER_STATUS_OPTIONS.map(s => `<option ${row.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>`;
+}
+
+function tenderRelevanceTag(row){
+  const level = row.relevance_level || '待確認';
+  const cls = { '高相關': 'teal', '待確認': 'brass', '低相關': 'muted' }[level] || 'muted';
+  const reasons = Array.isArray(row.relevance_reasons) ? row.relevance_reasons.join('；') : '';
+  return `<span class="tag tag-${cls}" title="${esc(reasons)}">${esc(level)}${row.relevance_score != null ? ` ${Number(row.relevance_score)}` : ''}</span>`;
+}
+
+function tenderCategoryLabels(categories){
+  const selected = Array.isArray(categories) && categories.length ? categories : DEFAULT_TENDER_SCAN_CATEGORIES;
+  const labels = selected.map(id => TENDER_SCAN_CATEGORIES.find(c => c.id === id)?.label).filter(Boolean);
+  return labels.length ? labels : ['全選'];
 }
 
 function selectTenderProject(id){
@@ -3059,11 +3099,33 @@ function openTenderProjectModal(id = null){
   document.getElementById('tpm-name').value = p?.name || '';
   document.getElementById('tpm-url').value = p?.source_url || '';
   document.getElementById('tpm-limit').value = p?.page_limit ?? 2;
+  document.getElementById('tpm-filter-mode').value = p?.filter_mode || '保守';
+  renderTenderCategoryChecks(p?.scan_categories);
   document.getElementById('tpm-active').checked = p?.is_active !== false;
   document.getElementById('tpm-email').value = p?.notify_email || '';
   document.getElementById('tpm-notes').value = p?.notes || '';
   document.getElementById('tpm-delete').style.display = id ? '' : 'none';
   openM('mtenderproject');
+}
+
+function renderTenderCategoryChecks(selectedCategories){
+  const selected = new Set(Array.isArray(selectedCategories) && selectedCategories.length ? selectedCategories : DEFAULT_TENDER_SCAN_CATEGORIES);
+  const wrap = document.getElementById('tpm-categories');
+  if (!wrap) return;
+  wrap.innerHTML = TENDER_SCAN_CATEGORIES.map(c => `
+    <label class="category-option">
+      <input type="checkbox" value="${esc(c.id)}" ${selected.has(c.id) ? 'checked' : ''}>
+      <span>${esc(c.label)}</span>
+    </label>`).join('');
+}
+
+function setTenderCategoryChecks(checked){
+  document.querySelectorAll('#tpm-categories input[type="checkbox"]').forEach(input => { input.checked = checked; });
+}
+
+function selectedTenderCategories(){
+  const values = [...document.querySelectorAll('#tpm-categories input[type="checkbox"]:checked')].map(input => input.value);
+  return values.length ? values : DEFAULT_TENDER_SCAN_CATEGORIES;
 }
 
 async function saveTenderProject(){
@@ -3074,17 +3136,24 @@ async function saveTenderProject(){
     name,
     source_url: sourceUrl,
     page_limit: Math.max(1, Math.min(Number(document.getElementById('tpm-limit').value) || 1, 10)),
+    filter_mode: document.getElementById('tpm-filter-mode').value || '保守',
+    scan_categories: selectedTenderCategories(),
     is_active: document.getElementById('tpm-active').checked,
     notify_email: document.getElementById('tpm-email').value.trim() || null,
     notes: document.getElementById('tpm-notes').value.trim() || null,
     updated_at: new Date().toISOString()
   };
   let savedId = editTenderProjectId;
-  if (editTenderProjectId) await PATCH(`tender_projects?id=eq.${editTenderProjectId}`, payload);
-  else {
-    const lastRank = TENDER_PROJECTS.reduce((max, p) => Math.max(max, tenderSortRank(p, 0)), 0);
-    const r = await POST('tender_projects', { ...payload, sort_order: lastRank + 10 });
-    savedId = r?.[0]?.id;
+  try {
+    if (editTenderProjectId) await PATCH(`tender_projects?id=eq.${editTenderProjectId}`, payload);
+    else {
+      const lastRank = TENDER_PROJECTS.reduce((max, p) => Math.max(max, tenderSortRank(p, 0)), 0);
+      const r = await POST('tender_projects', { ...payload, sort_order: lastRank + 10 });
+      savedId = r?.[0]?.id;
+    }
+  } catch (e) {
+    alert(`專案儲存失敗，請確認已執行 ${TENDER_FILTER_SQL_FILE}。`);
+    return;
   }
   selectedTenderProjectId = savedId;
   closeM('mtenderproject');

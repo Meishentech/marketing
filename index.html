@@ -270,6 +270,9 @@ tbody tr:last-child td{border-bottom:none}
 .fg1 input,.fg1 select,.fg1 textarea{padding:10px 12px;border-radius:3px;border:1.5px solid var(--line);font-size:15px;background:var(--paper)}
 .fg1 input:focus,.fg1 select:focus,.fg1 textarea:focus{outline:none;border-color:var(--teal)}
 .fg1 textarea{resize:vertical;min-height:76px}
+.category-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.category-option{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--paper);padding:9px 10px;font-size:14px;color:var(--text)}
+.category-option input{width:auto}
 
 .loading{text-align:center;padding:60px;color:var(--muted);font-size:13px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
 .empty{text-align:center;padding:48px;color:var(--muted);font-size:15px;border:1px dashed var(--line)}
@@ -288,6 +291,7 @@ tbody tr:last-child td{border-bottom:none}
   #main{margin-left:0;padding:18px 16px}
   #sql-screen{padding:14px}
   .fg{grid-template-columns:1fr}
+  .category-grid{grid-template-columns:1fr}
   .stat-row{grid-template-columns:1fr}
   .dash-kpi-grid{grid-template-columns:1fr}
   .filter-bar{grid-template-columns:1fr}
@@ -402,7 +406,16 @@ tbody tr:last-child td{border-bottom:none}
         <div class="fg1 ff"><label class="fl">專案名稱 *</label><input id="tpm-name" placeholder="例如 耕莘醫院招標公告"></div>
         <div class="fg1 ff"><label class="fl">監測網址 *</label><input id="tpm-url" placeholder="https://..."></div>
         <div class="fg1"><label class="fl">掃描頁數</label><input id="tpm-limit" type="number" min="1" max="10" value="2"></div>
+        <div class="fg1"><label class="fl">篩選模式</label><select id="tpm-filter-mode"><option>保守</option><option>平衡</option><option>嚴格</option></select></div>
         <div class="fg1"><label class="fl">啟用狀態</label><label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);padding-top:9px"><input id="tpm-active" type="checkbox" checked style="width:auto"> 每日 08:00 掃描</label></div>
+        <div class="fg1 ff">
+          <label class="fl">掃描類別</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-outline btn-sm" onclick="setTenderCategoryChecks(true)">全選</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="setTenderCategoryChecks(false)">清除</button>
+          </div>
+          <div id="tpm-categories" class="category-grid"></div>
+        </div>
         <div class="fg1 ff"><label class="fl">通知 Email</label><input id="tpm-email" type="email" placeholder="可用逗號分隔多個收件人"></div>
         <div class="fg1 ff"><label class="fl">備註</label><textarea id="tpm-notes" placeholder="例如 只追蹤空調、冰水主機、通風設備相關公告"></textarea></div>
       </div>

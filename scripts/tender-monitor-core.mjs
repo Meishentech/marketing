@@ -3,6 +3,36 @@ const DEFAULT_HEADERS = {
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 };
 
+export const DEFAULT_SCAN_CATEGORIES = [
+  'bid_open',
+  'procurement',
+  'deadline',
+  'chiller',
+  'central_ac',
+  'ventilation',
+  'maglev',
+  'exclude_closed',
+  'exclude_residential'
+];
+
+const CATEGORY_RULES = {
+  bid_open: { label: '招標 / 投標中', score: 30, terms: ['招標', '公開招標', '投標', '領標', '開標', '招商'] },
+  procurement: { label: '採購 / 報價', score: 24, terms: ['採購', '報價', '徵求', '邀標', '標案', '公告'] },
+  deadline: { label: '截止 / 開標日期', score: 10, terms: ['截止', '期限', '開標日期', '投標截止', '收件截止'] },
+  chiller: { label: '冰水主機', score: 45, terms: ['冰水主機', '冰水機', '冰機', 'chiller', 'Chiller'] },
+  central_ac: { label: '中央空調 / 空調設備', score: 34, terms: ['中央空調', '空調設備', '空調系統', '空調工程', '空調'] },
+  ventilation: { label: '通風設備', score: 26, terms: ['通風設備', '通風系統', '排風', '排煙', '送風'] },
+  maglev: { label: '磁浮 / 磁懸浮', score: 50, terms: ['磁浮', '磁懸浮', '磁軸承'] },
+  exclude_closed: { label: '排除決標 / 得標', score: -80, terms: ['決標', '得標', '流標', '廢標', '結果公告', '得標廠商'] },
+  exclude_residential: { label: '降低家用冷氣', score: -40, terms: ['家用冷氣', '分離式冷氣', '窗型冷氣', '冷氣機', '冷氣維修'] }
+};
+
+const FILTER_THRESHOLDS = {
+  '保守': { high: 55, review: 0 },
+  '平衡': { high: 70, review: 25 },
+  '嚴格': { high: 85, review: 45 }
+};
+
 export function createSupabaseClient({ supabaseUrl, serviceKey, apiKey, authToken }) {
   const restKey = apiKey || serviceKey;
   const authHeader = authToken || (serviceKey ? `Bearer ${serviceKey}` : '');
@@ -75,7 +105,13 @@ export async function scanProject(options) {
       const title = cleanText(extractTitle(detailHtml) || item.title);
       const haystack = `${title}\n${item.pageText || ''}\n${detailText}`;
       const matchedKeywords = words.filter(w => haystack.includes(w));
-      if (!matchedKeywords.length) continue;
+      const relevance = evaluateTenderRelevance({
+        text: haystack,
+        matchedKeywords,
+        scanCategories: project.scan_categories,
+        filterMode: project.filter_mode
+      });
+      if (!matchedKeywords.length && relevance.score < relevance.thresholds.review) continue;
 
       foundCount++;
       const publishedAt = extractPublishedDate(detailText);
@@ -87,6 +123,9 @@ export async function scanProject(options) {
           published_at: publishedAt,
           matched_keywords: matchedKeywords,
           snippet,
+          relevance_score: relevance.score,
+          relevance_level: relevance.level,
+          relevance_reasons: relevance.reasons,
           last_seen_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
@@ -97,11 +136,14 @@ export async function scanProject(options) {
           url: item.url,
           published_at: publishedAt,
           matched_keywords: matchedKeywords,
-          snippet
+          snippet,
+          relevance_score: relevance.score,
+          relevance_level: relevance.level,
+          relevance_reasons: relevance.reasons
         });
         newCount++;
       }
-      matchedRows.push({ title, url: item.url, publishedAt, matchedKeywords, snippet });
+      matchedRows.push({ title, url: item.url, publishedAt, matchedKeywords, snippet, relevance });
     }
 
     await sb.patch(`tender_scan_runs?id=eq.${run.id}`, {
@@ -218,6 +260,46 @@ function normalizeCandidateUrl(rawUrl) {
   const url = new URL(rawUrl);
   url.hash = '';
   return url.toString();
+}
+
+export function evaluateTenderRelevance({ text, matchedKeywords = [], scanCategories, filterMode = '保守' }) {
+  const categories = Array.isArray(scanCategories) && scanCategories.length ? scanCategories : DEFAULT_SCAN_CATEGORIES;
+  const thresholds = FILTER_THRESHOLDS[filterMode] || FILTER_THRESHOLDS['保守'];
+  const body = String(text || '');
+  const reasons = [];
+  let score = 0;
+
+  for (const keyword of matchedKeywords) {
+    const weight = keywordWeight(keyword);
+    score += weight;
+    reasons.push(`關鍵字「${keyword}」+${weight}`);
+  }
+
+  for (const category of categories) {
+    const rule = CATEGORY_RULES[category];
+    if (!rule) continue;
+    const matchedTerms = rule.terms.filter(term => body.includes(term));
+    if (!matchedTerms.length) continue;
+    score += rule.score;
+    const sign = rule.score > 0 ? '+' : '';
+    reasons.push(`${rule.label}：${matchedTerms.slice(0, 3).join('、')} ${sign}${rule.score}`);
+  }
+
+  let level = '低相關';
+  if (score >= thresholds.high) level = '高相關';
+  else if (score >= thresholds.review) level = '待確認';
+
+  return { score, level, reasons, thresholds };
+}
+
+function keywordWeight(keyword) {
+  if (/磁浮|磁懸浮|磁軸承/.test(keyword)) return 50;
+  if (/冰水主機|冰水機/.test(keyword)) return 45;
+  if (/中央空調/.test(keyword)) return 40;
+  if (/通風/.test(keyword)) return 30;
+  if (/空調/.test(keyword)) return 24;
+  if (/冷氣/.test(keyword)) return 12;
+  return 25;
 }
 
 function extractTitle(html) {
