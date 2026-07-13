@@ -25,6 +25,8 @@ export async function onRequestPost(context) {
       authToken: auth,
       projectId,
       pageLimitOverride: 1,
+      maxCandidates: 8,
+      activeSearchRequestLimit: 3,
       fetchDetails: false,
       notify: false,
       resendApiKey: context.env.RESEND_API_KEY,

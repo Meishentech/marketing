@@ -88,7 +88,12 @@ export async function scanProject(options) {
     const candidates = new Map();
     let checkedPages = 0;
     if (project.scan_mode === '主動找案') {
-      for (const item of await activeSearchCandidates({ project, words, maxCandidates: options.maxCandidates || 30 })) {
+      for (const item of await activeSearchCandidates({
+        project,
+        words,
+        maxCandidates: options.maxCandidates || 30,
+        requestLimit: options.activeSearchRequestLimit || ACTIVE_SEARCH_REQUEST_LIMIT
+      })) {
         if (!candidates.has(item.url)) candidates.set(item.url, item);
       }
       checkedPages = candidates.size;
@@ -227,11 +232,11 @@ export async function fetchHtml(url) {
   }
 }
 
-export function extractTenderLinks(html, baseUrl) {
+export function extractTenderLinks(html, baseUrl, maxLinks = 80) {
   const links = [];
   const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m;
-  while ((m = re.exec(html))) {
+  while ((m = re.exec(html)) && links.length < maxLinks) {
     const href = decodeHtml(m[1]);
     if (!/page_name=detail/i.test(href) || !/aid=803/i.test(href)) continue;
     const titleAttr = m[0].match(/\btitle=["']([^"']+)["']/i)?.[1];
@@ -243,7 +248,7 @@ export function extractTenderLinks(html, baseUrl) {
 }
 
 export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
-  const tenderLinks = extractTenderLinks(html, baseUrl);
+  const tenderLinks = extractTenderLinks(html, baseUrl, maxLinks);
   if (tenderLinks.length) return tenderLinks;
 
   const base = new URL(baseUrl);
@@ -275,7 +280,7 @@ export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
   return candidates;
 }
 
-async function activeSearchCandidates({ project, words, maxCandidates = 30 }) {
+async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT }) {
   const queries = activeSearchQueries(project, words);
   const seen = new Set();
   const candidates = [];
@@ -284,7 +289,7 @@ async function activeSearchCandidates({ project, words, maxCandidates = 30 }) {
     if (candidates.length >= maxCandidates) break;
     for (const searchQuery of activeSearchQueryVariants(query)) {
       if (candidates.length >= maxCandidates) break;
-      if (requestCount >= ACTIVE_SEARCH_REQUEST_LIMIT) return candidates;
+      if (requestCount >= requestLimit) return candidates;
       const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
       let html = '';
       requestCount++;
