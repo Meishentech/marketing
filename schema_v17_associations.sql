@@ -15,9 +15,7 @@ create table if not exists associations (
   internal_owner text,
   notes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint associations_type_check check (association_type in ('全國聯合會', '地方公會', '技師公會', '其他')),
-  constraint associations_join_status_check check (join_status in ('已加入', '待確認', '待續會', '停止'))
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists association_fee_records (
@@ -33,8 +31,7 @@ create table if not exists association_fee_records (
   renewal_reminder_date date,
   notes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint association_fee_status_check check (payment_status in ('未繳', '已繳', '待確認', '不適用'))
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists association_benefits (
@@ -48,9 +45,7 @@ create table if not exists association_benefits (
   owner text,
   notes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint association_benefit_type_check check (benefit_type in ('期刊曝光', '活動參與', '協辦活動', '會員名錄', '課程講座', '其他')),
-  constraint association_benefit_status_check check (usage_status in ('未使用', '準備中', '已使用', '不適用'))
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists association_publication_schedules (
@@ -68,8 +63,7 @@ create table if not exists association_publication_schedules (
   result_notes text,
   attachment text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint association_publication_status_check check (material_status in ('未開始', '準備中', '已送審', '已送件', '已刊登'))
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists association_events (
@@ -89,10 +83,7 @@ create table if not exists association_events (
   result_notes text,
   attachment text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint association_event_type_check check (event_type in ('會員大會', '協辦活動', '技術講座', '展覽', '餐會', '其他')),
-  constraint association_event_role_check check (meisun_role is null or meisun_role in ('會員參與', '協辦', '贊助', '講師', '展示')),
-  constraint association_event_status_check check (event_status in ('待確認', '準備中', '已完成', '取消'))
+  updated_at timestamptz not null default now()
 );
 
 alter table associations enable row level security;

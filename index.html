@@ -400,6 +400,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="mh"><div class="mt" id="at-title">新增公會任務</div><button class="mc" onclick="closeM('massoctask')">×</button></div>
     <div class="mb"><div class="fg">
       <div class="fg1 ff"><label class="fl">公會</label><select id="at-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">關聯行銷專案</label><select id="at-campaign" onchange="handleAssocCampaignSelect()"></select></div>
       <div class="fg1 ff"><label class="fl">任務名稱 *</label><input id="at-name"></div>
       <div class="fg1"><label class="fl">任務類型</label><select id="at-type"><option>會員大會</option><option>協辦活動</option><option>技術講座</option><option>期刊投稿</option><option>期刊廣告</option><option>年度贊助</option><option>拜訪聯繫</option><option>素材準備</option><option>其他</option></select></div>
       <div class="fg1"><label class="fl">任務狀態</label><select id="at-status"><option>待確認</option><option>未開始</option><option>準備中</option><option>已送審</option><option>已完成</option><option>取消</option></select></div>
@@ -742,8 +743,9 @@ tbody tr:last-child td{border-bottom:none}
           <div class="fg1"><label class="fl">更新日期</label><input id="rm-update-date" type="date"></div>
           <div class="fg1"><label class="fl">下次追蹤日</label><input id="rm-next-date" type="date"></div>
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:10px">
-          <button class="btn btn-outline btn-sm" onclick="saveRiskUpdate()">＋ 新增追蹤</button>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" id="rm-update-cancel" style="display:none" onclick="resetRiskUpdateForm()">取消編輯</button>
+          <button class="btn btn-outline btn-sm" id="rm-update-save" onclick="saveRiskUpdate()">＋ 新增追蹤</button>
         </div>
         <div id="rm-updates-list" style="margin-top:12px"></div>
       </div>

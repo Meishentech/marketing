@@ -3,6 +3,7 @@
 create table if not exists association_tasks (
   id uuid primary key default gen_random_uuid(),
   association_id uuid not null references associations(id) on delete cascade,
+  marketing_campaign_id uuid references marketing_campaigns(id) on delete set null,
   task_name text not null,
   task_type text not null default '其他',
   task_status text not null default '待確認',
@@ -19,9 +20,6 @@ create table if not exists association_tasks (
   attachment text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint association_task_type_check check (task_type in ('會員大會', '協辦活動', '技術講座', '期刊投稿', '期刊廣告', '年度贊助', '拜訪聯繫', '素材準備', '其他')),
-  constraint association_task_status_check check (task_status in ('待確認', '未開始', '準備中', '已送審', '已完成', '取消')),
-  constraint association_task_priority_check check (priority in ('高', '中', '低')),
   constraint association_task_progress_check check (progress_pct >= 0 and progress_pct <= 100)
 );
 
@@ -38,10 +36,11 @@ create table if not exists association_task_expenses (
   receipt_attachment text,
   notes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint association_task_expense_type_check check (expense_type in ('年費', '年度贊助', '活動贊助', '期刊費用', '設計製作', '印刷', '禮品', '交通餐費', '其他')),
-  constraint association_task_expense_payment_check check (payment_status in ('未付款', '已付款', '待確認', '不適用'))
+  updated_at timestamptz not null default now()
 );
+
+alter table association_tasks
+  add column if not exists marketing_campaign_id uuid references marketing_campaigns(id) on delete set null;
 
 alter table association_publication_schedules
   add column if not exists task_id uuid references association_tasks(id) on delete set null;
@@ -68,6 +67,7 @@ create policy "authenticated manage association task expenses"
   with check (true);
 
 create index if not exists idx_association_tasks_assoc_due on association_tasks(association_id, due_date);
+create index if not exists idx_association_tasks_campaign on association_tasks(marketing_campaign_id);
 create index if not exists idx_association_tasks_status on association_tasks(task_status, due_date);
 create index if not exists idx_association_task_expenses_assoc on association_task_expenses(association_id, payment_status);
 create index if not exists idx_association_task_expenses_task on association_task_expenses(task_id);
