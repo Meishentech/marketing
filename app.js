@@ -584,10 +584,10 @@ function _renderCampaignsBody(){
   const ordered = sortCampaignsManual(CAMPAIGNS);
   const rows = ordered.map((c, i) => `
     <tr onclick="campaignDetail('${c.id}')">
-      <td class="order-col" onclick="event.stopPropagation()">
-        <div class="campaign-order">
-          <button class="btn btn-outline campaign-order-btn" title="往上移" aria-label="往上移" onclick="moveCampaignSort('${c.id}', -1)" ${i === 0 || !campaignSortColumnReady ? 'disabled' : ''}>▲</button>
-          <button class="btn btn-outline campaign-order-btn" title="往下移" aria-label="往下移" onclick="moveCampaignSort('${c.id}', 1)" ${i === ordered.length - 1 || !campaignSortColumnReady ? 'disabled' : ''}>▼</button>
+      <td class="order-col" style="width:58px;min-width:58px;padding-left:8px;padding-right:8px;text-align:center" onclick="event.stopPropagation()">
+        <div class="campaign-order" style="display:inline-flex;gap:3px;align-items:center;justify-content:center">
+          <button class="btn btn-outline campaign-order-btn" style="width:24px;height:24px;padding:0;border-radius:3px;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center" title="往上移" aria-label="往上移" onclick="moveCampaignSort('${c.id}', -1)" ${i === 0 || !campaignSortColumnReady ? 'disabled' : ''}>▲</button>
+          <button class="btn btn-outline campaign-order-btn" style="width:24px;height:24px;padding:0;border-radius:3px;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center" title="往下移" aria-label="往下移" onclick="moveCampaignSort('${c.id}', 1)" ${i === ordered.length - 1 || !campaignSortColumnReady ? 'disabled' : ''}>▼</button>
         </div>
       </td>
       <td class="tb-name">${esc(c.name)}${c.association_id ? `<div class="cell-sub">${esc(assocName(c.association_id))}${c.association_activity_type ? `｜${esc(c.association_activity_type)}` : ''}</div>` : ''}</td>
@@ -618,7 +618,7 @@ function _renderCampaignsBody(){
     ${sortNotice}
     <div id="campaign-list" style="${isGantt ? 'display:none' : ''}" class="tw">
       <table class="campaign-table">
-        <thead><tr><th class="order-col">排序</th><th>專案名稱 / 關聯公會</th><th>執行狀態</th><th>重要性</th><th>預算</th></tr></thead>
+        <thead><tr><th class="order-col" style="width:58px;min-width:58px;padding-left:8px;padding-right:8px;text-align:center">排序</th><th>專案名稱 / 關聯公會</th><th>執行狀態</th><th>重要性</th><th>預算</th></tr></thead>
         <tbody>${rows || ''}</tbody>
       </table>
       ${rows ? '' : '<div class="empty">尚無行銷案</div>'}
