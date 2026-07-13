@@ -29,8 +29,6 @@ export async function onRequestPost(context) {
       activeSearchRequestLimit: 5,
       fetchDetails: false,
       notify: false,
-      googleSearchApiKey: context.env.GOOGLE_SEARCH_API_KEY,
-      googleSearchCx: context.env.GOOGLE_SEARCH_CX,
       resendApiKey: context.env.RESEND_API_KEY,
       notificationFrom: context.env.TENDER_NOTIFICATION_FROM,
       notificationTo: context.env.TENDER_NOTIFICATION_TO

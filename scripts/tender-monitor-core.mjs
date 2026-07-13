@@ -89,16 +89,12 @@ export async function scanProject(options) {
     let checkedPages = 0;
     let searchDiagnostics = null;
     if (project.scan_mode === '主動找案') {
-      const googleSearchApiKey = options.googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY');
-      const googleSearchCx = options.googleSearchCx || envVar('GOOGLE_SEARCH_CX');
       searchDiagnostics = { source: '政府採購網', queries: [], returned: 0, totalResults: 0, errors: [] };
       for (const item of await activeSearchCandidates({
         project,
         words,
         maxCandidates: options.maxCandidates || 30,
         requestLimit: options.activeSearchRequestLimit || ACTIVE_SEARCH_REQUEST_LIMIT,
-        googleSearchApiKey,
-        googleSearchCx,
         diagnostics: searchDiagnostics
       })) {
         if (!candidates.has(item.url)) candidates.set(item.url, item);
@@ -295,7 +291,7 @@ export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
   return candidates;
 }
 
-async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT, googleSearchApiKey, googleSearchCx, diagnostics }) {
+async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT, diagnostics }) {
   const rows = [];
   for (const item of await pccTenderCandidates({
     project,
@@ -308,19 +304,6 @@ async function activeSearchCandidates({ project, words, maxCandidates = 30, requ
     if (rows.length >= maxCandidates) return dedupeCandidates(rows).slice(0, maxCandidates);
   }
 
-  if (!googleSearchApiKey || !googleSearchCx) return dedupeCandidates(rows).slice(0, maxCandidates);
-  const queries = activeSearchQueryPlan(activeSearchQueries(project, words));
-  for (const item of await googleSearchCandidates({
-    queries,
-    maxCandidates,
-    requestLimit,
-    apiKey: googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY'),
-    cx: googleSearchCx || envVar('GOOGLE_SEARCH_CX'),
-    diagnostics
-  })) {
-    rows.push(item);
-    if (rows.length >= maxCandidates) break;
-  }
   return dedupeCandidates(rows).slice(0, maxCandidates);
 }
 
@@ -463,65 +446,6 @@ function parsePccTenderRows(html, baseUrl, query) {
     });
   }
   return rows;
-}
-
-async function googleSearchCandidates({ queries, maxCandidates, requestLimit, apiKey, cx, diagnostics }) {
-  if (!apiKey || !cx) return [];
-  const seen = new Set();
-  const candidates = [];
-  let requestCount = 0;
-  for (const query of queries) {
-    if (candidates.length >= maxCandidates) break;
-    if (requestCount >= requestLimit) break;
-    diagnostics?.queries.push(`Google:${query}`);
-    const url = new URL('https://www.googleapis.com/customsearch/v1');
-    url.searchParams.set('key', apiKey);
-    url.searchParams.set('cx', cx);
-    url.searchParams.set('q', query);
-    url.searchParams.set('num', '10');
-    requestCount++;
-    let data;
-    try {
-      const res = await fetch(url.toString(), { headers: DEFAULT_HEADERS });
-      if (!res.ok) {
-        diagnostics?.errors.push(`Google ${res.status}: ${await googleErrorMessage(res)}`);
-        continue;
-      }
-      data = await res.json();
-    } catch {
-      diagnostics?.errors.push('Google 連線失敗');
-      continue;
-    }
-    diagnostics.returned += Number(data.searchInformation?.totalResults || 0) ? (data.items || []).length : 0;
-    diagnostics.totalResults += Number(data.searchInformation?.totalResults || 0);
-    for (const item of data.items || []) {
-      if (candidates.length >= maxCandidates) break;
-      const link = String(item.link || '').trim();
-      if (!link || !/^https?:\/\//i.test(link)) continue;
-      if (/\.(jpg|jpeg|png|gif|webp|svg|zip|rar|css|js|ico)(\?|$)/i.test(link)) continue;
-      const normalized = normalizeCandidateUrl(link);
-      if (seen.has(normalized)) continue;
-      seen.add(normalized);
-      candidates.push({
-        title: cleanText(item.title || normalized),
-        url: normalized,
-        pageText: cleanText(`${item.title || ''} ${item.snippet || ''} ${item.displayLink || ''}`)
-      });
-    }
-  }
-  return candidates;
-}
-
-async function googleErrorMessage(res) {
-  const text = await res.text().catch(() => '');
-  if (!text) return '無錯誤內容';
-  try {
-    const data = JSON.parse(text);
-    const message = data?.error?.message || data?.error?.status || text;
-    return cleanText(message).slice(0, 160);
-  } catch {
-    return cleanText(text).slice(0, 160);
-  }
 }
 
 function activeSearchQueries(project, words) {
