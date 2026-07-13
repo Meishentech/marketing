@@ -13,7 +13,7 @@
 - 帳號管理：登入頁支援忘記密碼；新開通帳號可標記首次登入必須變更預設密碼
 - 總表可匯出 Excel（CSV）
 - 新聞蒐集（依關鍵字抓取 Google News RSS，經 rss2json.com 中轉，需要 API key，見下方設定）
-- 每週文案彙整：手動建立草稿，可從新聞蒐集一鍵帶入標題/連結，一鍵複製貼到 Facebook / Google Sheet
+- 每週文案彙整：可在後台手動產生本週草稿，也可手動建立草稿、從新聞蒐集一鍵帶入標題/連結，一鍵複製貼到 Facebook / Google Sheet
 - 每週一自動草稿（GitHub Actions 排程）：自動抓新聞、用 Claude Haiku 生成文案草稿寫入平台，狀態固定為「草稿」，一律要人工在「每週文案彙整」頁確認後才算數，不會自動發布
 
 ## 建置步驟
@@ -23,6 +23,7 @@
 4. 編輯 `core/config.js`，填入 `SB`（Project URL）與 `KEY`（anon public key）
 5. 部署到 Cloudflare Pages（`/api/news` 需要 Pages Functions 才能運作，純本機開檔案 `index.html` 無法測新聞蒐集）
 6. Cloudflare Pages → Settings → Environment variables 新增 `RSS2JSON_API_KEY`（[rss2json.com](https://rss2json.com/docs) 免費申請）
+   - 若要使用後台「產生本週草稿」按鈕，Cloudflare Pages 也需新增 `SUPABASE_SERVICE_ROLE_KEY` 與 `ANTHROPIC_API_KEY`
 7. 投標工具的「立即掃描」會使用登入者權限寫入 Supabase；如需 Email 通知，Cloudflare Pages 可加 `RESEND_API_KEY`、`TENDER_NOTIFICATION_FROM`、`TENDER_NOTIFICATION_TO`
 
 ## 每週自動草稿設定（選用）

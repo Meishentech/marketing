@@ -3192,10 +3192,37 @@ async function renderDraftsPage(){
 
   document.getElementById('vc').innerHTML = `
     <div class="ph">
-      <div><div class="pt">每週文案彙整</div><div class="ps">手動彙整，確認後自行貼到 Facebook / Google Sheet</div></div>
-      <button class="btn btn-primary" onclick="openDraftModal()">＋ 新增文案</button>
+      <div><div class="pt">每週文案彙整</div><div class="ps">可手動產生本週草稿，確認後自行貼到 Facebook / Google Sheet</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline" id="draft-generate-btn" onclick="generateWeeklyDrafts()">產生本週草稿</button>
+        <button class="btn btn-primary" onclick="openDraftModal()">＋ 新增文案</button>
+      </div>
     </div>
     ${body}`;
+}
+
+async function generateWeeklyDrafts(){
+  const btn = document.getElementById('draft-generate-btn');
+  const oldText = btn?.textContent || '產生本週草稿';
+  if (btn) { btn.disabled = true; btn.textContent = '產生中…'; }
+  try {
+    const res = await fetch('/api/weekly-content', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionStorage.getItem('ms_token') || ''}`
+      },
+      body: JSON.stringify({ week: mondayOf() })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || '產生失敗');
+    alert(`本週草稿產生完成：新增 ${data.created || 0} 則，略過 ${data.skipped || 0} 則。`);
+    await renderDraftsPage();
+  } catch (e) {
+    alert(`本週草稿產生失敗：${e.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = oldText; }
+  }
 }
 
 function openDraftModal(id, prefill){
