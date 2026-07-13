@@ -393,12 +393,59 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+
+<!-- 公會任務 modal -->
+<div class="mo" id="massoctask">
+  <div class="md">
+    <div class="mh"><div class="mt" id="at-title">新增公會任務</div><button class="mc" onclick="closeM('massoctask')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會</label><select id="at-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">任務名稱 *</label><input id="at-name"></div>
+      <div class="fg1"><label class="fl">任務類型</label><select id="at-type"><option>會員大會</option><option>協辦活動</option><option>技術講座</option><option>期刊投稿</option><option>期刊廣告</option><option>年度贊助</option><option>拜訪聯繫</option><option>素材準備</option><option>其他</option></select></div>
+      <div class="fg1"><label class="fl">任務狀態</label><select id="at-status"><option>待確認</option><option>未開始</option><option>準備中</option><option>已送審</option><option>已完成</option><option>取消</option></select></div>
+      <div class="fg1"><label class="fl">優先級</label><select id="at-priority"><option>高</option><option selected>中</option><option>低</option></select></div>
+      <div class="fg1"><label class="fl">進度 %</label><input id="at-progress" type="number" min="0" max="100"></div>
+      <div class="fg1"><label class="fl">開始日期</label><input id="at-start" type="date"></div>
+      <div class="fg1"><label class="fl">截止日期</label><input id="at-due" type="date"></div>
+      <div class="fg1"><label class="fl">完成日期</label><input id="at-completed" type="date"></div>
+      <div class="fg1"><label class="fl">負責人</label><input id="at-owner"></div>
+      <div class="fg1 ff"><label class="fl">任務說明</label><textarea id="at-desc"></textarea></div>
+      <div class="fg1 ff"><label class="fl">下一步</label><input id="at-next"></div>
+      <div class="fg1 ff"><label class="fl">需準備素材</label><input id="at-materials" placeholder="DM、文案、Logo、產品圖片、簡報、案例、名片、廣告圖"></div>
+      <div class="fg1 ff"><label class="fl">附件欄位</label><input id="at-attachment" placeholder="附件連結、檔名或存放位置"></div>
+      <div class="fg1 ff"><label class="fl">備註</label><textarea id="at-notes"></textarea></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="at-delete" onclick="delAssocTask()">刪除</button><button class="btn btn-outline" onclick="closeM('massoctask')">取消</button><button class="btn btn-primary" onclick="saveAssocTask()">儲存</button></div>
+  </div>
+</div>
+
+<!-- 公會任務費用 modal -->
+<div class="mo" id="massocexpense">
+  <div class="md">
+    <div class="mh"><div class="mt" id="ax-title">新增任務費用</div><button class="mc" onclick="closeM('massocexpense')">×</button></div>
+    <div class="mb"><div class="fg">
+      <div class="fg1 ff"><label class="fl">公會</label><select id="ax-assoc" onchange="setAssocTaskSelect('ax-task', this.value, document.getElementById('ax-task').value)"></select></div>
+      <div class="fg1 ff"><label class="fl">關聯任務</label><select id="ax-task"></select></div>
+      <div class="fg1"><label class="fl">費用類型</label><select id="ax-type"><option>年費</option><option>年度贊助</option><option>活動贊助</option><option>期刊費用</option><option>設計製作</option><option>印刷</option><option>禮品</option><option>交通餐費</option><option>其他</option></select></div>
+      <div class="fg1"><label class="fl">付款狀態</label><select id="ax-status"><option>未付款</option><option>已付款</option><option>待確認</option><option>不適用</option></select></div>
+      <div class="fg1"><label class="fl">預算金額</label><input id="ax-budget" type="number"></div>
+      <div class="fg1"><label class="fl">實際支出</label><input id="ax-actual" type="number"></div>
+      <div class="fg1"><label class="fl">付款日期</label><input id="ax-paid" type="date"></div>
+      <div class="fg1"><label class="fl">發票 / 收據狀態</label><input id="ax-receipt-status"></div>
+      <div class="fg1 ff"><label class="fl">收據檔案或附件</label><input id="ax-attachment" placeholder="附件連結、檔名或存放位置"></div>
+      <div class="fg1 ff"><label class="fl">備註</label><textarea id="ax-notes"></textarea></div>
+    </div></div>
+    <div class="mf"><button class="btn btn-red" id="ax-delete" onclick="delAssocExpense()">刪除</button><button class="btn btn-outline" onclick="closeM('massocexpense')">取消</button><button class="btn btn-primary" onclick="saveAssocExpense()">儲存</button></div>
+  </div>
+</div>
+
 <!-- 公會期刊 modal -->
 <div class="mo" id="massocpub">
   <div class="md">
     <div class="mh"><div class="mt" id="ap-title">新增期刊排程</div><button class="mc" onclick="closeM('massocpub')">×</button></div>
     <div class="mb"><div class="fg">
-      <div class="fg1 ff"><label class="fl">公會</label><select id="ap-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">公會</label><select id="ap-assoc" onchange="setAssocTaskSelect('ap-task', this.value, document.getElementById('ap-task').value)"></select></div>
+      <div class="fg1 ff"><label class="fl">關聯任務</label><select id="ap-task"></select></div>
       <div class="fg1 ff"><label class="fl">期刊名稱 *</label><input id="ap-name"></div>
       <div class="fg1"><label class="fl">發刊日期</label><input id="ap-publish" type="date"></div>
       <div class="fg1"><label class="fl">截稿日期</label><input id="ap-deadline" type="date"></div>
@@ -420,7 +467,8 @@ tbody tr:last-child td{border-bottom:none}
   <div class="md">
     <div class="mh"><div class="mt" id="ae-title">新增會員大會 / 活動</div><button class="mc" onclick="closeM('massocevent')">×</button></div>
     <div class="mb"><div class="fg">
-      <div class="fg1 ff"><label class="fl">公會</label><select id="ae-assoc"></select></div>
+      <div class="fg1 ff"><label class="fl">公會</label><select id="ae-assoc" onchange="setAssocTaskSelect('ae-task', this.value, document.getElementById('ae-task').value)"></select></div>
+      <div class="fg1 ff"><label class="fl">關聯任務</label><select id="ae-task"></select></div>
       <div class="fg1 ff"><label class="fl">活動名稱 *</label><input id="ae-name"></div>
       <div class="fg1"><label class="fl">活動類型</label><select id="ae-type"><option>會員大會</option><option>協辦活動</option><option>技術講座</option><option>展覽</option><option>餐會</option><option>其他</option></select></div>
       <div class="fg1"><label class="fl">日期</label><input id="ae-date" type="date"></div>

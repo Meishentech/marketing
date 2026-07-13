@@ -41,6 +41,8 @@ let ASSOC_BENEFITS = [];
 let ASSOC_PUBLICATIONS = [];
 let ASSOC_EVENTS = [];
 let ASSOC_NOTES = [];
+let ASSOC_TASKS = [];
+let ASSOC_EXPENSES = [];
 let RESOURCE_FILTERS = { q: '', type: '', audience: '', external: '', sort: 'updated' };
 let ASSOC_TAB = 'overview';
 let _view = 'dashboard';
@@ -60,6 +62,8 @@ let editAssocBenefitId = null;
 let editAssocPubId = null;
 let editAssocEventId = null;
 let editAssocNoteId = null;
+let editAssocTaskId = null;
+let editAssocExpenseId = null;
 let quickRiskId = null;
 let detailCampaignId = null;
 let detailCampaignCache = null;
@@ -1538,6 +1542,14 @@ function joinList(v){ return Array.isArray(v) ? v.join('、') : (v || ''); }
 function assocSelectOptions(selected){
   return ASSOCIATIONS.map(a => `<option value="${a.id}" ${selected === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
 }
+function taskById(id){ return ASSOC_TASKS.find(t => t.id === id); }
+function taskName(id){ return taskById(id)?.task_name || '-'; }
+function assocTasks(associationId){ return ASSOC_TASKS.filter(t => t.association_id === associationId); }
+function assocExpenses(associationId){ return ASSOC_EXPENSES.filter(e => e.association_id === associationId); }
+function taskSelectOptions(associationId, selected, emptyLabel = '不關聯任務'){
+  const tasks = associationId ? assocTasks(associationId) : ASSOC_TASKS;
+  return `<option value="">${emptyLabel}</option>` + tasks.map(t => `<option value="${t.id}" ${selected === t.id ? 'selected' : ''}>${esc(t.task_name)}</option>`).join('');
+}
 function assocStatusTag(status){
   const cls = { '已加入':'teal', '待確認':'brass', '待續會':'grant', '停止':'muted' }[status] || 'muted';
   return `<span class="tag tag-${cls}">${esc(status)}</span>`;
@@ -1550,13 +1562,15 @@ function simpleStatusTag(status){
   return `<span class="tag tag-${cls}">${esc(status || '-')}</span>`;
 }
 async function loadAssociationsData(){
-  [ASSOCIATIONS, ASSOC_FEES, ASSOC_BENEFITS, ASSOC_PUBLICATIONS, ASSOC_EVENTS, ASSOC_NOTES] = await Promise.all([
+  [ASSOCIATIONS, ASSOC_FEES, ASSOC_BENEFITS, ASSOC_PUBLICATIONS, ASSOC_EVENTS, ASSOC_NOTES, ASSOC_TASKS, ASSOC_EXPENSES] = await Promise.all([
     safeGET('associations?order=updated_at.desc'),
     safeGET('association_fee_records?order=year.desc,due_date.asc'),
     safeGET('association_benefits?order=valid_until.asc'),
     safeGET('association_publication_schedules?order=deadline_date.asc'),
     safeGET('association_events?order=event_date.asc'),
-    safeGET('association_notes?order=updated_at.desc')
+    safeGET('association_notes?order=updated_at.desc'),
+    safeGET('association_tasks?order=due_date.asc,updated_at.desc'),
+    safeGET('association_task_expenses?order=updated_at.desc')
   ]);
 }
 function latestFee(associationId){
@@ -1575,8 +1589,27 @@ function latestAssocUpdated(a){
     ...ASSOC_PUBLICATIONS.filter(x => x.association_id === a.id).map(x => x.updated_at),
     ...ASSOC_EVENTS.filter(x => x.association_id === a.id).map(x => x.updated_at),
     ...ASSOC_NOTES.filter(x => x.association_id === a.id).map(x => x.updated_at),
+    ...ASSOC_TASKS.filter(x => x.association_id === a.id).map(x => x.updated_at),
+    ...ASSOC_EXPENSES.filter(x => x.association_id === a.id).map(x => x.updated_at),
   ].filter(Boolean).sort();
   return related.at(-1) || a?.updated_at || '';
+}
+function nextAssocTask(associationId){
+  return assocTasks(associationId).filter(t => !['已完成','取消'].includes(t.task_status))
+    .sort((a, b) => String(a.due_date || '9999').localeCompare(String(b.due_date || '9999')))[0];
+}
+function openTaskCount(associationId){
+  return assocTasks(associationId).filter(t => !['已完成','取消'].includes(t.task_status)).length;
+}
+function expenseTotals(associationId){
+  return assocExpenses(associationId).reduce((sum, e) => {
+    sum.budget += Number(e.budget_amount) || 0;
+    sum.actual += Number(e.actual_amount) || 0;
+    return sum;
+  }, { budget: 0, actual: 0 });
+}
+function unpaidExpenseCount(associationId){
+  return assocExpenses(associationId).filter(e => ['未付款','待確認'].includes(e.payment_status)).length;
 }
 function nextPublication(associationId){
   return ASSOC_PUBLICATIONS.filter(p => p.association_id === associationId && p.material_status !== '已刊登')
@@ -1594,10 +1627,16 @@ function assocBadges(a){
   const pub = nextPublication(a.id);
   const ev = nextAssocEvent(a.id);
   const badges = [];
+  const task = nextAssocTask(a.id);
+  const unpaid = unpaidExpenseCount(a.id);
+  if (task && isPast(task.due_date)) badges.push('<span class="case-tag">任務逾期</span>');
+  if (task && task.task_status === '準備中') badges.push('<span class="case-tag">任務準備中</span>');
   if (fee && fee.payment_status !== '已繳' && (inNextDays(fee.due_date, 45) || isPast(fee.due_date))) badges.push('<span class="case-tag">年費即將到期</span>');
   if (pub && inNextDays(pub.deadline_date, 21)) badges.push('<span class="case-tag">期刊截稿將至</span>');
+  if (pub && pub.material_status !== '已刊登' && isPast(pub.deadline_date)) badges.push('<span class="case-tag">稿件未完成</span>');
   if (ev && ev.event_status === '準備中') badges.push('<span class="case-tag">活動準備中</span>');
   if (unusedBenefitCount(a.id) > 0) badges.push('<span class="case-tag">權益尚未使用</span>');
+  if (unpaid > 0) badges.push('<span class="case-tag">費用未付款</span>');
   if (!a.primary_contact || !a.internal_owner || a.internal_owner === '待補') badges.push('<span class="case-tag">資料待補</span>');
   return badges.join(' ');
 }
@@ -1605,12 +1644,14 @@ function assocTabs(){
   const tabs = [
     ['overview','公會總覽'],
     ['details','公會資料詳情'],
+    ['tasks','任務管理'],
+    ['expenses','任務費用'],
     ['fees','年費與續會'],
     ['publications','期刊資料準備排程'],
     ['events','會員大會 / 協辦活動'],
     ['benefits','權益與備註']
   ];
-  return `<div class="filter-bar" style="grid-template-columns:repeat(6,minmax(120px,1fr));margin-bottom:16px">
+  return `<div class="filter-bar" style="grid-template-columns:repeat(8,minmax(120px,1fr));margin-bottom:16px">
     ${tabs.map(([key, label]) => `<button class="btn ${ASSOC_TAB === key ? 'btn-primary' : 'btn-outline'}" onclick="setAssocTab('${key}')">${label}</button>`).join('')}
   </div>`;
 }
@@ -1624,6 +1665,8 @@ async function renderAssociationsPage(load = true){
   const actions = {
     overview: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
     details: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
+    tasks: '<button class="btn btn-primary" onclick="openAssocTaskModal()">＋ 新增任務</button>',
+    expenses: '<button class="btn btn-primary" onclick="openAssocExpenseModal()">＋ 新增費用</button>',
     fees: '<button class="btn btn-primary" onclick="openAssocFeeModal()">＋ 新增年費</button>',
     publications: '<button class="btn btn-primary" onclick="openAssocPubModal()">＋ 新增期刊排程</button>',
     events: '<button class="btn btn-primary" onclick="openAssocEventModal()">＋ 新增活動</button>',
@@ -1636,6 +1679,8 @@ async function renderAssociationsPage(load = true){
 }
 function renderAssociationTab(){
   if (ASSOC_TAB === 'details') return renderAssocDetails();
+  if (ASSOC_TAB === 'tasks') return renderAssocTasks();
+  if (ASSOC_TAB === 'expenses') return renderAssocExpenses();
   if (ASSOC_TAB === 'fees') return renderAssocFees();
   if (ASSOC_TAB === 'publications') return renderAssocPublications();
   if (ASSOC_TAB === 'events') return renderAssocEvents();
@@ -1644,17 +1689,22 @@ function renderAssociationTab(){
 }
 function renderAssocOverview(){
   const rows = ASSOCIATIONS.map(a => {
-    const fee = latestFee(a.id);
+    const fee = currentYearFee(a.id);
     const pub = nextPublication(a.id);
     const ev = nextAssocEvent(a.id);
+    const task = nextAssocTask(a.id);
+    const totals = expenseTotals(a.id);
     return `<tr onclick="openAssociationModal('${a.id}')">
       <td class="tb-name">${esc(a.name)}<div class="muted-text">${esc(a.association_type || '待補')}</div></td>
       <td>${assocStatusTag(a.join_status)}</td>
       <td>${fee ? simpleStatusTag(fee.payment_status) : '<span class="muted-text">待補</span>'}</td>
       <td>${fdFull(fee?.due_date || '')}</td>
+      <td class="mono">${openTaskCount(a.id)}</td>
+      <td>${task ? `${fdFull(task.due_date || '')}<div class="muted-text">${esc(task.task_name)}</div>` : '<span class="muted-text">待補</span>'}</td>
       <td>${fdFull(pub?.deadline_date || '')}${pub ? `<div class="muted-text">${esc(pub.publication_name)}</div>` : ''}</td>
       <td>${ev ? `${fdFull(ev.event_date || '')}<div class="muted-text">${esc(ev.event_name)}</div>` : '<span class="muted-text">待補</span>'}</td>
       <td class="mono">${unusedBenefitCount(a.id)}</td>
+      <td class="tb-amt">${fmt(totals.budget)} / ${fmt(totals.actual)}</td>
       <td>${esc(a.internal_owner || '待補')}</td>
       <td>${fdFull(latestAssocUpdated(a).slice(0, 10) || '')}</td>
       <td><div class="case-tags">${assocBadges(a) || '<span class="case-tag">目前無提醒</span>'}</div></td>
@@ -1662,12 +1712,12 @@ function renderAssocOverview(){
   }).join('');
   return `<div class="dash-kpi-grid">
     <div class="stat-box"><div class="kpi-label">公會數</div><div class="stat-num mono">${ASSOCIATIONS.length}</div></div>
-    <div class="stat-box"><div class="kpi-label">年費待確認/未繳</div><div class="stat-num mono">${ASSOC_FEES.filter(f => f.payment_status !== '已繳').length}</div></div>
+    <div class="stat-box"><div class="kpi-label">進行中任務</div><div class="stat-num mono">${ASSOC_TASKS.filter(t => !['已完成','取消'].includes(t.task_status)).length}</div></div>
+    <div class="stat-box"><div class="kpi-label">費用未付款</div><div class="stat-num mono">${ASSOC_EXPENSES.filter(e => ['未付款','待確認'].includes(e.payment_status)).length}</div></div>
     <div class="stat-box"><div class="kpi-label">期刊待準備</div><div class="stat-num mono">${ASSOC_PUBLICATIONS.filter(p => p.material_status !== '已刊登').length}</div></div>
-    <div class="stat-box"><div class="kpi-label">未使用權益</div><div class="stat-num mono">${ASSOC_BENEFITS.filter(b => ['未使用','準備中'].includes(b.usage_status)).length}</div></div>
   </div>
   <div class="tw"><table>
-    <thead><tr><th>公會名稱</th><th>加入狀態</th><th>本年度年費狀態</th><th>年費到期日</th><th>最近期刊截稿日</th><th>下一場活動 / 會員大會</th><th>未使用權益數</th><th>內部負責人</th><th>最後更新</th><th>狀態標籤</th></tr></thead>
+    <thead><tr><th>公會名稱</th><th>加入狀態</th><th>本年度年費狀態</th><th>年費到期日</th><th>進行中任務數</th><th>最近任務期限</th><th>最近期刊截稿日</th><th>下一場活動 / 會員大會</th><th>未使用權益數</th><th>預算 / 已支出</th><th>內部負責人</th><th>最後更新</th><th>狀態標籤</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>${rows ? '' : '<div class="empty">尚無公會資料，請先新增公會或執行 schema_v17_associations.sql</div>'}</div>`;
 }
@@ -1692,6 +1742,18 @@ function renderAssocDetails(){
     </div>`).join('');
   return rows || '<div class="empty">尚無公會資料</div>';
 }
+function renderAssocTasks(){
+  const rows = ASSOC_TASKS.map(t => `<tr onclick="openAssocTaskModal('${t.id}')">
+    <td class="tb-name">${esc(assocName(t.association_id))}</td><td>${esc(t.task_name)}</td><td><span class="case-tag">${esc(t.task_type)}</span></td><td>${simpleStatusTag(t.task_status)}</td><td>${priorityTag(t.priority || '中')}</td><td>${fdFull(t.start_date || '')}</td><td>${fdFull(t.due_date || '')}</td><td class="mono">${Number(t.progress_pct) || 0}%</td><td>${esc(t.owner || '-')}</td><td>${esc(t.next_step || '-')}</td>
+  </tr>`).join('');
+  return `<div class="tw"><table><thead><tr><th>公會</th><th>任務名稱</th><th>任務類型</th><th>狀態</th><th>優先級</th><th>開始日期</th><th>截止日期</th><th>進度</th><th>負責人</th><th>下一步</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql</div>'}</div>`;
+}
+function renderAssocExpenses(){
+  const rows = ASSOC_EXPENSES.map(e => `<tr onclick="openAssocExpenseModal('${e.id}')">
+    <td class="tb-name">${esc(assocName(e.association_id))}</td><td>${esc(taskName(e.task_id))}</td><td><span class="case-tag">${esc(e.expense_type)}</span></td><td class="tb-amt">NT$ ${fmt(e.budget_amount)}</td><td class="tb-amt">NT$ ${fmt(e.actual_amount)}</td><td>${simpleStatusTag(e.payment_status)}</td><td>${fdFull(e.payment_date || '')}</td><td>${esc(e.receipt_status || '-')}</td><td>${esc(e.receipt_attachment || '-')}</td><td>${esc(e.notes || '-')}</td>
+  </tr>`).join('');
+  return `<div class="tw"><table><thead><tr><th>公會</th><th>關聯任務</th><th>費用類型</th><th>預算金額</th><th>實際支出</th><th>付款狀態</th><th>付款日期</th><th>發票 / 收據</th><th>附件</th><th>備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務費用紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql</div>'}</div>`;
+}
 function renderAssocFees(){
   const rows = ASSOC_FEES.map(f => `<tr onclick="openAssocFeeModal('${f.id}')">
     <td class="tb-name">${esc(assocName(f.association_id))}</td><td class="mono">${esc(f.year)}</td><td class="tb-amt">NT$ ${fmt(f.fee_amount)}</td><td>${simpleStatusTag(f.payment_status)}</td><td>${fdFull(f.payment_date || '')}</td><td>${fdFull(f.due_date || '')}</td><td>${esc(f.receipt_status || '-')}</td><td>${fdFull(f.renewal_reminder_date || '')}</td><td>${esc(f.notes || '-')}</td>
@@ -1710,15 +1772,15 @@ function renderAssocBenefits(){
 }
 function renderAssocPublications(){
   const rows = ASSOC_PUBLICATIONS.map(p => `<tr onclick="openAssocPubModal('${p.id}')">
-    <td class="tb-name">${esc(assocName(p.association_id))}</td><td>${esc(p.publication_name)}</td><td>${fdFull(p.publish_date || '')}</td><td>${fdFull(p.deadline_date || '')}</td><td>${esc(p.topic || '-')}</td><td>${esc(joinList(p.required_materials) || '-')}</td><td>${simpleStatusTag(p.material_status)}</td><td>${esc(p.owner || '-')}</td><td>${fdFull(p.submission_date || '')}</td>
+    <td class="tb-name">${esc(assocName(p.association_id))}</td><td>${esc(taskName(p.task_id))}</td><td>${esc(p.publication_name)}</td><td>${fdFull(p.publish_date || '')}</td><td>${fdFull(p.deadline_date || '')}</td><td>${esc(p.topic || '-')}</td><td>${esc(joinList(p.required_materials) || '-')}</td><td>${simpleStatusTag(p.material_status)}</td><td>${esc(p.owner || '-')}</td><td>${fdFull(p.submission_date || '')}</td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>期刊名稱</th><th>發刊日期</th><th>截稿日期</th><th>主題</th><th>所需素材</th><th>素材狀態</th><th>負責人</th><th>送件日期</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無期刊排程</div>'}</div>`;
+  return `<div class="tw"><table><thead><tr><th>公會</th><th>關聯任務</th><th>期刊名稱</th><th>發刊日期</th><th>截稿日期</th><th>主題</th><th>所需素材</th><th>素材狀態</th><th>負責人</th><th>送件日期</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無期刊排程</div>'}</div>`;
 }
 function renderAssocEvents(){
   const rows = ASSOC_EVENTS.map(e => `<tr onclick="openAssocEventModal('${e.id}')">
-    <td class="tb-name">${esc(assocName(e.association_id))}</td><td>${esc(e.event_name)}</td><td><span class="case-tag">${esc(e.event_type)}</span></td><td>${fdFull(e.event_date || '')}</td><td>${esc(e.location || '-')}</td><td>${esc(e.meisun_role || '-')}</td><td class="tb-amt">NT$ ${fmt(e.budget)}</td><td class="tb-amt">NT$ ${fmt(e.actual_spend)}</td><td>${simpleStatusTag(e.event_status)}</td><td>${esc(e.owner || '-')}</td>
+    <td class="tb-name">${esc(assocName(e.association_id))}</td><td>${esc(taskName(e.task_id))}</td><td>${esc(e.event_name)}</td><td><span class="case-tag">${esc(e.event_type)}</span></td><td>${fdFull(e.event_date || '')}</td><td>${esc(e.location || '-')}</td><td>${esc(e.meisun_role || '-')}</td><td class="tb-amt">NT$ ${fmt(e.budget)}</td><td class="tb-amt">NT$ ${fmt(e.actual_spend)}</td><td>${simpleStatusTag(e.event_status)}</td><td>${esc(e.owner || '-')}</td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>活動名稱</th><th>類型</th><th>日期</th><th>地點</th><th>美昇角色</th><th>預算</th><th>實際支出</th><th>狀態</th><th>負責人</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員大會 / 活動紀錄</div>'}</div>`;
+  return `<div class="tw"><table><thead><tr><th>公會</th><th>關聯任務</th><th>活動名稱</th><th>類型</th><th>日期</th><th>地點</th><th>美昇角色</th><th>預算</th><th>實際支出</th><th>狀態</th><th>負責人</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員大會 / 活動紀錄</div>'}</div>`;
 }
 
 function openAssociationModal(id){
@@ -1774,6 +1836,7 @@ async function delAssociation(){
 }
 
 function setAssocSelect(id, selected){ document.getElementById(id).innerHTML = assocSelectOptions(selected); }
+function setAssocTaskSelect(id, associationId, selected){ document.getElementById(id).innerHTML = taskSelectOptions(associationId, selected); }
 function defaultAssocId(){ return ASSOCIATIONS[0]?.id || ''; }
 function openAssocFeeModal(id){
   editAssocFeeId = id || null;
@@ -1837,11 +1900,111 @@ async function saveAssocBenefit(){
 }
 async function delAssocBenefit(){ if (!editAssocBenefitId || !confirm('確定刪除此會員權益？')) return; await DEL(`association_benefits?id=eq.${editAssocBenefitId}`); closeM('massocbenefit'); ASSOC_TAB = 'benefits'; await renderAssociationsPage(); }
 
+function openAssocTaskModal(id){
+  editAssocTaskId = id || null;
+  const t = id ? ASSOC_TASKS.find(x => x.id === id) : null;
+  document.getElementById('at-title').textContent = id ? '編輯公會任務' : '新增公會任務';
+  setAssocSelect('at-assoc', t?.association_id || defaultAssocId());
+  document.getElementById('at-name').value = t?.task_name || '';
+  document.getElementById('at-type').value = t?.task_type || '其他';
+  document.getElementById('at-status').value = t?.task_status || '待確認';
+  document.getElementById('at-priority').value = t?.priority || '中';
+  document.getElementById('at-start').value = t?.start_date || '';
+  document.getElementById('at-due').value = t?.due_date || '';
+  document.getElementById('at-completed').value = t?.completed_date || '';
+  document.getElementById('at-progress').value = t?.progress_pct ?? 0;
+  document.getElementById('at-owner').value = t?.owner || '';
+  document.getElementById('at-desc').value = t?.description || '';
+  document.getElementById('at-next').value = t?.next_step || '';
+  document.getElementById('at-materials').value = joinList(t?.required_materials) || '';
+  document.getElementById('at-attachment').value = t?.attachment || '';
+  document.getElementById('at-notes').value = t?.notes || '';
+  document.getElementById('at-delete').style.display = id ? '' : 'none';
+  openM('massoctask');
+}
+async function saveAssocTask(){
+  const name = document.getElementById('at-name').value.trim();
+  if (!name) { alert('請輸入任務名稱'); return; }
+  const payload = {
+    association_id: document.getElementById('at-assoc').value,
+    task_name: name,
+    task_type: document.getElementById('at-type').value,
+    task_status: document.getElementById('at-status').value,
+    priority: document.getElementById('at-priority').value,
+    start_date: document.getElementById('at-start').value || null,
+    due_date: document.getElementById('at-due').value || null,
+    completed_date: document.getElementById('at-completed').value || null,
+    progress_pct: Math.max(0, Math.min(100, Number(document.getElementById('at-progress').value) || 0)),
+    owner: document.getElementById('at-owner').value.trim() || null,
+    description: document.getElementById('at-desc').value.trim() || null,
+    next_step: document.getElementById('at-next').value.trim() || null,
+    required_materials: splitList(document.getElementById('at-materials').value),
+    attachment: document.getElementById('at-attachment').value.trim() || null,
+    notes: document.getElementById('at-notes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (editAssocTaskId) await PATCH(`association_tasks?id=eq.${editAssocTaskId}`, payload);
+    else await POST('association_tasks', payload);
+  } catch (e) { alert('任務資料表尚未啟用，請先執行 schema_v19_association_tasks_expenses.sql。'); return; }
+  closeM('massoctask'); ASSOC_TAB = 'tasks'; await renderAssociationsPage();
+}
+async function delAssocTask(){
+  if (!editAssocTaskId || !confirm('確定刪除此公會任務？相關費用會保留但解除任務關聯。')) return;
+  await DEL(`association_tasks?id=eq.${editAssocTaskId}`);
+  closeM('massoctask'); ASSOC_TAB = 'tasks'; await renderAssociationsPage();
+}
+
+function openAssocExpenseModal(id){
+  editAssocExpenseId = id || null;
+  const e = id ? ASSOC_EXPENSES.find(x => x.id === id) : null;
+  const assocId = e?.association_id || defaultAssocId();
+  document.getElementById('ax-title').textContent = id ? '編輯任務費用' : '新增任務費用';
+  setAssocSelect('ax-assoc', assocId);
+  setAssocTaskSelect('ax-task', assocId, e?.task_id || '');
+  document.getElementById('ax-type').value = e?.expense_type || '其他';
+  document.getElementById('ax-budget').value = e?.budget_amount ?? '';
+  document.getElementById('ax-actual').value = e?.actual_amount ?? '';
+  document.getElementById('ax-status').value = e?.payment_status || '未付款';
+  document.getElementById('ax-paid').value = e?.payment_date || '';
+  document.getElementById('ax-receipt-status').value = e?.receipt_status || '';
+  document.getElementById('ax-attachment').value = e?.receipt_attachment || '';
+  document.getElementById('ax-notes').value = e?.notes || '';
+  document.getElementById('ax-delete').style.display = id ? '' : 'none';
+  openM('massocexpense');
+}
+async function saveAssocExpense(){
+  const payload = {
+    association_id: document.getElementById('ax-assoc').value,
+    task_id: document.getElementById('ax-task').value || null,
+    expense_type: document.getElementById('ax-type').value,
+    budget_amount: document.getElementById('ax-budget').value || null,
+    actual_amount: document.getElementById('ax-actual').value || null,
+    payment_status: document.getElementById('ax-status').value,
+    payment_date: document.getElementById('ax-paid').value || null,
+    receipt_status: document.getElementById('ax-receipt-status').value.trim() || null,
+    receipt_attachment: document.getElementById('ax-attachment').value.trim() || null,
+    notes: document.getElementById('ax-notes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (editAssocExpenseId) await PATCH(`association_task_expenses?id=eq.${editAssocExpenseId}`, payload);
+    else await POST('association_task_expenses', payload);
+  } catch (e) { alert('任務費用資料表尚未啟用，請先執行 schema_v19_association_tasks_expenses.sql。'); return; }
+  closeM('massocexpense'); ASSOC_TAB = 'expenses'; await renderAssociationsPage();
+}
+async function delAssocExpense(){
+  if (!editAssocExpenseId || !confirm('確定刪除此任務費用？')) return;
+  await DEL(`association_task_expenses?id=eq.${editAssocExpenseId}`);
+  closeM('massocexpense'); ASSOC_TAB = 'expenses'; await renderAssociationsPage();
+}
+
 function openAssocPubModal(id){
   editAssocPubId = id || null;
   const p = id ? ASSOC_PUBLICATIONS.find(x => x.id === id) : null;
   document.getElementById('ap-title').textContent = id ? '編輯期刊排程' : '新增期刊排程';
   setAssocSelect('ap-assoc', p?.association_id || defaultAssocId());
+  setAssocTaskSelect('ap-task', p?.association_id || defaultAssocId(), p?.task_id || '');
   document.getElementById('ap-name').value = p?.publication_name || '';
   document.getElementById('ap-publish').value = p?.publish_date || '';
   document.getElementById('ap-deadline').value = p?.deadline_date || '';
@@ -1859,7 +2022,7 @@ function openAssocPubModal(id){
 async function saveAssocPub(){
   const name = document.getElementById('ap-name').value.trim();
   if (!name) { alert('請輸入期刊名稱'); return; }
-  const payload = { association_id: document.getElementById('ap-assoc').value, publication_name: name, publish_date: document.getElementById('ap-publish').value || null, deadline_date: document.getElementById('ap-deadline').value || null, ad_spec: document.getElementById('ap-spec').value.trim() || null, topic: document.getElementById('ap-topic').value.trim() || null, required_materials: splitList(document.getElementById('ap-materials').value), material_status: document.getElementById('ap-status').value, owner: document.getElementById('ap-owner').value.trim() || null, submission_date: document.getElementById('ap-submit').value || null, result_notes: document.getElementById('ap-result').value.trim() || null, attachment: document.getElementById('ap-attachment').value.trim() || null, updated_at: new Date().toISOString() };
+  const payload = { association_id: document.getElementById('ap-assoc').value, task_id: document.getElementById('ap-task').value || null, publication_name: name, publish_date: document.getElementById('ap-publish').value || null, deadline_date: document.getElementById('ap-deadline').value || null, ad_spec: document.getElementById('ap-spec').value.trim() || null, topic: document.getElementById('ap-topic').value.trim() || null, required_materials: splitList(document.getElementById('ap-materials').value), material_status: document.getElementById('ap-status').value, owner: document.getElementById('ap-owner').value.trim() || null, submission_date: document.getElementById('ap-submit').value || null, result_notes: document.getElementById('ap-result').value.trim() || null, attachment: document.getElementById('ap-attachment').value.trim() || null, updated_at: new Date().toISOString() };
   if (editAssocPubId) await PATCH(`association_publication_schedules?id=eq.${editAssocPubId}`, payload);
   else await POST('association_publication_schedules', payload);
   closeM('massocpub'); ASSOC_TAB = 'publications'; await renderAssociationsPage();
@@ -1871,6 +2034,7 @@ function openAssocEventModal(id){
   const e = id ? ASSOC_EVENTS.find(x => x.id === id) : null;
   document.getElementById('ae-title').textContent = id ? '編輯會員大會 / 活動' : '新增會員大會 / 活動';
   setAssocSelect('ae-assoc', e?.association_id || defaultAssocId());
+  setAssocTaskSelect('ae-task', e?.association_id || defaultAssocId(), e?.task_id || '');
   document.getElementById('ae-name').value = e?.event_name || '';
   document.getElementById('ae-type').value = e?.event_type || '其他';
   document.getElementById('ae-date').value = e?.event_date || '';
@@ -1890,7 +2054,7 @@ function openAssocEventModal(id){
 async function saveAssocEvent(){
   const name = document.getElementById('ae-name').value.trim();
   if (!name) { alert('請輸入活動名稱'); return; }
-  const payload = { association_id: document.getElementById('ae-assoc').value, event_name: name, event_type: document.getElementById('ae-type').value, event_date: document.getElementById('ae-date').value || null, location: document.getElementById('ae-location').value.trim() || null, organizer: document.getElementById('ae-organizer').value.trim() || null, meisun_role: document.getElementById('ae-role').value || null, budget: document.getElementById('ae-budget').value || null, actual_spend: document.getElementById('ae-spend').value || null, required_materials: splitList(document.getElementById('ae-materials').value), event_status: document.getElementById('ae-status').value, owner: document.getElementById('ae-owner').value.trim() || null, result_notes: document.getElementById('ae-result').value.trim() || null, attachment: document.getElementById('ae-attachment').value.trim() || null, updated_at: new Date().toISOString() };
+  const payload = { association_id: document.getElementById('ae-assoc').value, task_id: document.getElementById('ae-task').value || null, event_name: name, event_type: document.getElementById('ae-type').value, event_date: document.getElementById('ae-date').value || null, location: document.getElementById('ae-location').value.trim() || null, organizer: document.getElementById('ae-organizer').value.trim() || null, meisun_role: document.getElementById('ae-role').value || null, budget: document.getElementById('ae-budget').value || null, actual_spend: document.getElementById('ae-spend').value || null, required_materials: splitList(document.getElementById('ae-materials').value), event_status: document.getElementById('ae-status').value, owner: document.getElementById('ae-owner').value.trim() || null, result_notes: document.getElementById('ae-result').value.trim() || null, attachment: document.getElementById('ae-attachment').value.trim() || null, updated_at: new Date().toISOString() };
   if (editAssocEventId) await PATCH(`association_events?id=eq.${editAssocEventId}`, payload);
   else await POST('association_events', payload);
   closeM('massocevent'); ASSOC_TAB = 'events'; await renderAssociationsPage();
