@@ -117,29 +117,26 @@ export async function scanProject(options) {
       const publishedAt = extractPublishedDate(detailText);
       const snippet = makeSnippet(haystack, matchedKeywords[0]);
       const existing = await sb.get(`tender_results?project_id=eq.${project.id}&url=eq.${encodeURIComponent(item.url)}&select=id`);
+      const resultPayload = {
+        title,
+        published_at: publishedAt,
+        matched_keywords: matchedKeywords,
+        snippet,
+        relevance_score: relevance.score,
+        relevance_level: relevance.level,
+        relevance_reasons: relevance.reasons
+      };
       if (existing?.[0]?.id) {
-        await sb.patch(`tender_results?id=eq.${existing[0].id}`, {
-          title,
-          published_at: publishedAt,
-          matched_keywords: matchedKeywords,
-          snippet,
-          relevance_score: relevance.score,
-          relevance_level: relevance.level,
-          relevance_reasons: relevance.reasons,
+        await saveTenderResult(sb, 'patch', `tender_results?id=eq.${existing[0].id}`, {
+          ...resultPayload,
           last_seen_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
       } else {
-        await sb.post('tender_results', {
+        await saveTenderResult(sb, 'post', 'tender_results', {
           project_id: project.id,
-          title,
           url: item.url,
-          published_at: publishedAt,
-          matched_keywords: matchedKeywords,
-          snippet,
-          relevance_score: relevance.score,
-          relevance_level: relevance.level,
-          relevance_reasons: relevance.reasons
+          ...resultPayload
         });
         newCount++;
       }
@@ -290,6 +287,28 @@ export function evaluateTenderRelevance({ text, matchedKeywords = [], scanCatego
   else if (score >= thresholds.review) level = '待確認';
 
   return { score, level, reasons, thresholds };
+}
+
+async function saveTenderResult(sb, method, path, payload) {
+  try {
+    return method === 'patch' ? await sb.patch(path, payload) : await sb.post(path, payload);
+  } catch (err) {
+    if (!isRelevanceSchemaCacheError(err)) throw err;
+    const fallback = { ...payload };
+    delete fallback.relevance_score;
+    delete fallback.relevance_level;
+    delete fallback.relevance_reasons;
+    return method === 'patch' ? await sb.patch(path, fallback) : await sb.post(path, fallback);
+  }
+}
+
+function isRelevanceSchemaCacheError(err) {
+  const msg = String(err?.message || err || '');
+  return msg.includes('PGRST204') && (
+    msg.includes('relevance_score') ||
+    msg.includes('relevance_level') ||
+    msg.includes('relevance_reasons')
+  );
 }
 
 function keywordWeight(keyword) {
