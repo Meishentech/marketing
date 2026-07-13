@@ -52,7 +52,7 @@ export async function scanProject(options) {
     const words = (keywords || []).map(k => k.keyword).filter(Boolean);
     if (!words.length) throw new Error('此專案沒有啟用中的關鍵字');
 
-    const pages = projectPageUrls(project.source_url, project.page_limit || 1);
+    const pages = projectPageUrls(project.source_url, options.pageLimitOverride || project.page_limit || 1);
     const candidates = new Map();
     for (const pageUrl of pages) {
       const html = await fetchHtml(pageUrl);

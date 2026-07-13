@@ -24,6 +24,7 @@ export async function onRequestPost(context) {
       apiKey: anonKey,
       authToken: auth,
       projectId,
+      pageLimitOverride: 1,
       fetchDetails: false,
       notify: false,
       resendApiKey: context.env.RESEND_API_KEY,
