@@ -111,7 +111,7 @@ export async function scanProject(options) {
         scanCategories: project.scan_categories,
         filterMode: project.filter_mode
       });
-      if (!matchedKeywords.length && relevance.score < relevance.thresholds.review) continue;
+      if (!matchedKeywords.length) continue;
 
       foundCount++;
       const publishedAt = extractPublishedDate(detailText);
