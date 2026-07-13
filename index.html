@@ -372,6 +372,7 @@ tbody tr:last-child td{border-bottom:none}
   <nav>
     <div class="ni" data-view="dashboard" onclick="nav('dashboard')">總覽</div>
     <div class="ni" data-view="campaigns" onclick="nav('campaigns')">行銷案管理</div>
+    <div class="ni" data-view="subsidies" onclick="nav('subsidies')">補助管理</div>
     <div class="ni" data-view="performance" onclick="nav('performance')">成效查詢</div>
     <div class="ni" data-view="resources" onclick="nav('resources')">行銷資源庫</div>
     <div class="ni" data-view="externalResources" onclick="nav('externalResources')">對外素材</div>
@@ -572,11 +573,11 @@ tbody tr:last-child td{border-bottom:none}
         <div class="fg1"><label class="fl">重要性</label>
           <select id="cm-priority"><option>高</option><option selected>中</option><option>低</option></select>
         </div>
-        <div class="fg1"><label class="fl">專案總預算</label><input id="cm-budget" type="number"></div>
-        <div class="fg1"><label class="fl">實際花費</label><input id="cm-actual" type="number"></div>
-        <div class="fg1"><label class="fl">美的預計補助</label><input id="cm-subsidy-planned" type="number"></div>
-        <div class="fg1"><label class="fl">美的已核發補助</label><input id="cm-subsidy-received" type="number"></div>
-        <div class="fg1"><label class="fl">美的預算編號</label><input id="cm-midea-code" placeholder="例如 EVT00000072"></div>
+        <div class="fg1"><label class="fl">內部預估金額</label><input id="cm-budget" type="number"></div>
+        <div class="fg1"><label class="fl">實際產生金額</label><input id="cm-actual" type="number"></div>
+        <div class="fg1"><label class="fl">預估補助金額</label><input id="cm-subsidy-planned" type="number"></div>
+        <div class="fg1"><label class="fl">實際補助金額</label><input id="cm-subsidy-received" type="number"></div>
+        <div class="fg1"><label class="fl">美的補助申請號碼</label><input id="cm-midea-code" placeholder="例如 EVT00000072"></div>
         <div class="fg1"><label class="fl">機票費用</label><input id="cm-flight" type="number"></div>
         <div class="fg1"><label class="fl">付款狀態</label><input id="cm-payment-status" placeholder="例如 已付款給廠商／尚未匯款"></div>
         <div class="fg1"><label class="fl">請款狀態</label><input id="cm-claim-status" placeholder="例如 已開立 Debit Note／尚未請款"></div>

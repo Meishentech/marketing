@@ -103,6 +103,7 @@ async function nav(view){
   document.querySelectorAll('.ni').forEach(el => el.classList.toggle('on', el.dataset.view === view));
   if (view === 'dashboard') await renderDashboard();
   else if (view === 'campaigns') await renderCampaignsPage();
+  else if (view === 'subsidies') await renderSubsidiesPage();
   else if (view === 'drafts') await renderDraftsPage();
   else if (view === 'news') await renderNewsPage();
   else if (view === 'cases') await renderCasesPage();
@@ -258,6 +259,36 @@ function riskFollowupMeta(risk, latest){
   return { key: 'current', label: `最近更新 ${fdFull(latest.update_date)}`, priority: 8 };
 }
 
+function campaignFiscalYear(c){
+  const raw = c.actual_start || c.planned_start || c.created_at || '';
+  return raw ? Number(raw.slice(0, 4)) : new Date().getFullYear();
+}
+
+function isSubsidyApplied(c){
+  return !!(c.midea_budget_code || Number(c.subsidy_received) || /已|申請|送出|送件|請款|核|Debit/i.test(`${c.claim_status || ''}${c.payment_status || ''}`));
+}
+
+function subsidySummary(campaigns, year = new Date().getFullYear()){
+  const rows = campaigns.filter(c => campaignFiscalYear(c) === year && (
+    c.midea_budget_code || c.subsidy_planned != null || c.subsidy_received != null || c.claim_status || c.payment_status || c.status === '補助申請'
+  ));
+  const applied = rows.filter(isSubsidyApplied);
+  const unapplied = rows.filter(c => !isSubsidyApplied(c) && Number(c.subsidy_planned));
+  const planned = rows.reduce((s, c) => s + (Number(c.subsidy_planned) || 0), 0);
+  const received = rows.reduce((s, c) => s + (Number(c.subsidy_received) || 0), 0);
+  const appliedPlanned = applied.reduce((s, c) => s + (Number(c.subsidy_planned) || 0), 0);
+  const pendingIssue = applied.reduce((s, c) => s + Math.max(0, (Number(c.subsidy_planned) || 0) - (Number(c.subsidy_received) || 0)), 0);
+  const unappliedAmount = unapplied.reduce((s, c) => s + (Number(c.subsidy_planned) || 0), 0);
+  return { rows, applied, unapplied, planned, received, appliedPlanned, pendingIssue, unappliedAmount };
+}
+
+function subsidyStateTag(c){
+  if (Number(c.subsidy_received)) return '<span class="tag tag-deep">已核發</span>';
+  if (isSubsidyApplied(c)) return '<span class="tag tag-grant">已申請</span>';
+  if (Number(c.subsidy_planned)) return '<span class="tag tag-brass">尚未申請</span>';
+  return '<span class="tag tag-muted">待補</span>';
+}
+
 // ── DASHBOARD ──
 async function renderDashboard(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
@@ -278,6 +309,7 @@ async function renderDashboard(){
   const subsidyPlanned = CAMPAIGNS.reduce((s, c) => s + (Number(c.subsidy_planned) || 0), 0);
   const subsidyReceived = CAMPAIGNS.reduce((s, c) => s + (Number(c.subsidy_received) || 0), 0);
   const subsidyRate = subsidyPlanned ? Math.round(subsidyReceived / subsidyPlanned * 100) : 0;
+  const currentSubsidy = subsidySummary(CAMPAIGNS);
   const execRate = totalBudget ? Math.round(totalSpend / totalBudget * 100) : 0;
 
   const campaignById = Object.fromEntries(CAMPAIGNS.map(c => [c.id, c]));
@@ -396,6 +428,11 @@ async function renderDashboard(){
       <div><div class="dash-item-title">${esc(c.name)}</div><div class="dash-item-sub">預算 NT$ ${fmt(c.budget)} · ${esc(c.owner || '未指定負責人')}</div></div>
       ${tag(c.status)}
     </div>`).join('') || '<div class="empty">目前沒有進行中專案</div>';
+  const subsidyRows = currentSubsidy.rows.slice(0, 7).map(c => `
+    <div class="dash-item" onclick="campaignDetail('${c.id}')">
+      <div><div class="dash-item-title">${esc(c.name)}</div><div class="dash-item-sub">預估補助 NT$ ${fmt(c.subsidy_planned)} · 實際補助 NT$ ${fmt(c.subsidy_received)}${c.midea_budget_code ? ' · ' + esc(c.midea_budget_code) : ''}</div></div>
+      ${subsidyStateTag(c)}
+    </div>`).join('') || '<div class="empty">今年尚無補助追蹤資料</div>';
   const pendingRows = followupItems.slice(0, 7).map(({ c, r, latest, meta }) => `
     <div class="dash-item" onclick="campaignDetail('${c.id}')">
       <div><div class="dash-item-title">${esc(r.title)}</div><div class="dash-item-sub">${esc(c.name)} · ${esc(meta.label)}${latest?.update_note ? ' · ' + esc(latest.update_note).slice(0, 28) : ''}</div></div>
@@ -427,6 +464,10 @@ async function renderDashboard(){
         <div class="dash-list">${pendingRows}</div>
       </div>
       <div class="card dash-panel">
+        <div class="dash-panel-head"><div><div class="kpi-label">今年補助追蹤</div><div class="dash-panel-title">已核發 NT$ ${fmt(currentSubsidy.received)}</div></div><button class="btn btn-outline btn-sm" onclick="nav('subsidies')">查看</button></div>
+        <div class="dash-list">${subsidyRows}</div>
+      </div>
+      <div class="card dash-panel">
         <div class="dash-panel-head"><div><div class="kpi-label">近期成效</div><div class="dash-panel-title">${dashboardPerformance.length} 筆成效紀錄</div></div><button class="btn btn-outline btn-sm" onclick="nav('performance')">查看</button></div>
         <div class="dash-list">${performanceRows}</div>
       </div>
@@ -435,6 +476,48 @@ async function renderDashboard(){
         <div class="dash-list">${resourceRows}</div>
       </div>
     </div>`;
+}
+
+// ── SUBSIDIES：補助管理 ──
+async function renderSubsidiesPage(){
+  document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
+  const data = await GET('marketing_campaigns?order=created_at.desc') || [];
+  CAMPAIGNS = sortByStatus(data || []);
+  const year = new Date().getFullYear();
+  const summary = subsidySummary(CAMPAIGNS, year);
+  const rows = summary.rows.map(c => {
+    const internal = Number(c.budget) || 0;
+    const actual = Number(c.actual_spend) || 0;
+    const planned = Number(c.subsidy_planned) || 0;
+    const received = Number(c.subsidy_received) || 0;
+    const variance = received - planned;
+    return `<tr onclick="campaignDetail('${c.id}')">
+      <td><div class="cell-main clamp2">${esc(c.name)}</div><div class="cell-sub">${esc(c.owner || '未指定')}｜${fdFull((c.planned_start || c.actual_start || c.created_at || '').slice(0, 10))}</div></td>
+      <td class="status-col">${subsidyStateTag(c)}<div class="cell-sub clip">${esc(c.midea_budget_code || '尚無申請號碼')}</div></td>
+      <td class="money-col"><div class="mono">NT$ ${fmt(planned)}</div><div class="cell-sub">預估補助</div></td>
+      <td class="money-col"><div class="mono">NT$ ${fmt(received)}</div><div class="cell-sub">實際補助</div></td>
+      <td class="money-col"><div class="mono">NT$ ${fmt(internal)}</div><div class="cell-sub">內部預估</div></td>
+      <td class="money-col"><div class="mono">NT$ ${fmt(actual)}</div><div class="cell-sub">實際產生</div></td>
+      <td><div class="cell-main mono" style="color:${variance < 0 ? 'var(--rust)' : 'var(--teal-deep)'}">NT$ ${fmt(variance)}</div><div class="cell-sub clamp2">${esc(c.claim_status || c.payment_status || '-')}</div></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('vc').innerHTML = `
+    <div class="ph">
+      <div><div class="pt">補助管理</div><div class="ps">${year} 年美的補助申請、核發與尚未申請統整</div></div>
+      <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>
+    </div>
+    <div class="dash-kpi-grid">
+      <div class="stat-box"><div class="kpi-label">實際申請補助專案</div><div class="stat-num mono">${summary.applied.length}</div></div>
+      <div class="stat-box"><div class="kpi-label">預估補助金額</div><div class="stat-num mono">NT$ ${fmt(summary.planned)}</div></div>
+      <div class="stat-box"><div class="kpi-label">實際核發補助</div><div class="stat-num mono">NT$ ${fmt(summary.received)}</div></div>
+      <div class="stat-box"><div class="kpi-label">已申請待核發</div><div class="stat-num mono">NT$ ${fmt(summary.pendingIssue)}</div></div>
+      <div class="stat-box"><div class="kpi-label">尚未申請補助款</div><div class="stat-num mono">NT$ ${fmt(summary.unappliedAmount)}</div></div>
+    </div>
+    <div class="tw"><table class="assoc-table">
+      <thead><tr><th>專案</th><th class="status-col">申請狀態 / 號碼</th><th class="money-col">預估補助</th><th class="money-col">實際補助</th><th class="money-col">內部預估</th><th class="money-col">實際產生</th><th>差異 / 請款狀態</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>${rows ? '' : '<div class="empty">今年尚無補助追蹤資料。請先在行銷案填寫補助欄位。</div>'}</div>`;
 }
 
 // ── CAMPAIGNS：總表 ──
@@ -711,10 +794,10 @@ function buildWeeklyReport(c){
   if (!openTasks.length) lines.push('- 所有任務皆已完成或尚未建立任務');
   lines.push('');
   lines.push('## 5. 預算與補助');
-  lines.push(`- 專案預算：NT$ ${fmt(budgetTotal)}`);
-  lines.push(`- 實際花費：NT$ ${fmt(spend)}（${execRate}%）`);
+  lines.push(`- 內部預估金額：NT$ ${fmt(budgetTotal)}`);
+  lines.push(`- 實際產生金額：NT$ ${fmt(spend)}（${execRate}%）`);
   if (totalBudgetItems) lines.push(`- 預算明細合計：NT$ ${fmt(totalBudgetItems)}`);
-  if (c.subsidy_planned != null || c.subsidy_received != null) lines.push(`- 美的補助：已核發 NT$ ${fmt(c.subsidy_received)} / 預計 NT$ ${fmt(c.subsidy_planned)}`);
+  if (c.subsidy_planned != null || c.subsidy_received != null) lines.push(`- 美的補助：實際補助 NT$ ${fmt(c.subsidy_received)} / 預估補助 NT$ ${fmt(c.subsidy_planned)}`);
   if (c.claim_status || c.payment_status) lines.push(`- 請款/付款：${c.claim_status || '-'} / ${c.payment_status || '-'}`);
   lines.push('');
   lines.push('## 6. 下週追蹤重點');
@@ -801,13 +884,13 @@ async function campaignDetail(id){
       </div>
 
       <div class="card detail-block">
-        <div class="kpi-label">專案預算</div>
+        <div class="kpi-label">內部預估金額</div>
         <div class="stat-num">NT$ ${fmt(c.budget)}</div>
-        <div class="muted-text" style="margin-top:6px">實際花費 NT$ ${fmt(c.actual_spend)}（${execRate}%）</div>
+        <div class="muted-text" style="margin-top:6px">實際產生金額 NT$ ${fmt(c.actual_spend)}（${execRate}%）</div>
         <div class="kpi-bar" style="background:var(--line)"><i style="width:${Math.min(100, execRate)}%;background:var(--teal)"></i></div>
         ${(c.subsidy_planned != null || c.subsidy_received != null) ? `
-          <div class="muted-text" style="margin-top:10px">美的預計補助 NT$ ${fmt(c.subsidy_planned)}</div>
-          <div class="muted-text" style="margin-top:2px">美的已核發補助 NT$ ${fmt(c.subsidy_received)}</div>` : ''}
+          <div class="muted-text" style="margin-top:10px">預估補助金額 NT$ ${fmt(c.subsidy_planned)}</div>
+          <div class="muted-text" style="margin-top:2px">實際補助金額 NT$ ${fmt(c.subsidy_received)}</div>` : ''}
       </div>
 
       <div class="card detail-block">
@@ -834,7 +917,7 @@ async function campaignDetail(id){
       ${hasSubsidyMeta ? `
       <div class="card detail-block">
         <div class="kpi-label">補助與請款狀態</div>
-        ${c.midea_budget_code ? `<div class="detail-text" style="font-size:14px">美的預算編號　<span class="mono">${esc(c.midea_budget_code)}</span></div>` : ''}
+        ${c.midea_budget_code ? `<div class="detail-text" style="font-size:14px">美的補助申請號碼　<span class="mono">${esc(c.midea_budget_code)}</span></div>` : ''}
         ${c.payment_status ? `<div class="detail-text" style="font-size:14px;margin-top:4px">付款狀態　${esc(c.payment_status)}</div>` : ''}
         ${c.claim_status ? `<div class="detail-text" style="font-size:14px;margin-top:4px">請款狀態　${esc(c.claim_status)}</div>` : ''}
         ${c.flight_cost != null ? `<div class="detail-text" style="font-size:14px;margin-top:4px">機票費用　NT$ ${fmt(c.flight_cost)}</div>` : ''}
@@ -2510,7 +2593,7 @@ function csvCell(v){
 }
 
 function exportCampaignsCSV(){
-  const headers = ['專案名稱', '關聯公會', '公會活動類型', '執行狀態', '重要性', '預算', '實際花費', '美的預計補助', '美的已核發補助', '美的預算編號', '付款狀態', '請款狀態', '機票費用', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
+  const headers = ['專案名稱', '關聯公會', '公會活動類型', '執行狀態', '重要性', '內部預估金額', '實際產生金額', '預估補助金額', '實際補助金額', '美的補助申請號碼', '付款狀態', '請款狀態', '機票費用', '負責人', '負責單位', '負責公司', '預計開始', '預計結束', '實際開始', '實際結束', '專案說明'];
   const rows = CAMPAIGNS.map(c => [c.name, assocName(c.association_id), c.association_activity_type, c.status, c.priority, c.budget, c.actual_spend, c.subsidy_planned, c.subsidy_received, c.midea_budget_code, c.payment_status, c.claim_status, c.flight_cost, c.owner, c.owner_unit, (c.vendors || []).join('、'), c.planned_start, c.planned_end, c.actual_start, c.actual_end, c.purpose]);
   const csv = [headers, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
