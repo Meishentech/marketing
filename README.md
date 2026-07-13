@@ -23,7 +23,7 @@
 4. 編輯 `core/config.js`，填入 `SB`（Project URL）與 `KEY`（anon public key）
 5. 部署到 Cloudflare Pages（`/api/news` 需要 Pages Functions 才能運作，純本機開檔案 `index.html` 無法測新聞蒐集）
 6. Cloudflare Pages → Settings → Environment variables 新增 `RSS2JSON_API_KEY`（[rss2json.com](https://rss2json.com/docs) 免費申請）
-7. 若要使用投標工具的「立即掃描」，Cloudflare Pages 另需設定 `SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`；如需 Email 通知，再加 `RESEND_API_KEY`、`TENDER_NOTIFICATION_FROM`、`TENDER_NOTIFICATION_TO`
+7. 若要使用投標工具的「立即掃描」，Cloudflare Pages 需設定 `SUPABASE_SERVICE_ROLE_KEY`；如需覆蓋預設 Supabase 專案，可另設 `SUPABASE_URL`、`SUPABASE_ANON_KEY`；如需 Email 通知，再加 `RESEND_API_KEY`、`TENDER_NOTIFICATION_FROM`、`TENDER_NOTIFICATION_TO`
 
 ## 每週自動草稿設定（選用）
 在 GitHub repo → Settings → Secrets and variables → Actions，新增以下 secrets：
