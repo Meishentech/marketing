@@ -330,7 +330,7 @@ async function googleSearchCandidates({ queries, maxCandidates, requestLimit, ap
     try {
       const res = await fetch(url.toString(), { headers: DEFAULT_HEADERS });
       if (!res.ok) {
-        diagnostics?.errors.push(`Google ${res.status}`);
+        diagnostics?.errors.push(`Google ${res.status}: ${await googleErrorMessage(res)}`);
         continue;
       }
       data = await res.json();
@@ -356,6 +356,18 @@ async function googleSearchCandidates({ queries, maxCandidates, requestLimit, ap
     }
   }
   return candidates;
+}
+
+async function googleErrorMessage(res) {
+  const text = await res.text().catch(() => '');
+  if (!text) return '無錯誤內容';
+  try {
+    const data = JSON.parse(text);
+    const message = data?.error?.message || data?.error?.status || text;
+    return cleanText(message).slice(0, 160);
+  } catch {
+    return cleanText(text).slice(0, 160);
+  }
 }
 
 function activeSearchQueries(project, words) {
