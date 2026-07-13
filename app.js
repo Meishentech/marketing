@@ -3118,7 +3118,7 @@ async function scanTenderProject(id){
     alert(`掃描完成：命中 ${data.foundCount} 筆，新發現 ${data.newCount} 筆`);
     await renderTendersPage();
   } catch (e) {
-    alert(`掃描失敗：${e.message}\n請確認 Cloudflare Pages 已設定 SUPABASE_SERVICE_ROLE_KEY。`);
+    alert(`掃描失敗：${e.message}\n請確認已登入平台，且已執行投標工具 SQL。`);
   }
 }
 

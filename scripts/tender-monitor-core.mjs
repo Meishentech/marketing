@@ -3,14 +3,16 @@ const DEFAULT_HEADERS = {
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 };
 
-export function createSupabaseClient({ supabaseUrl, serviceKey }) {
-  if (!supabaseUrl || !serviceKey) throw new Error('缺少 SUPABASE_URL 或 SUPABASE_SERVICE_ROLE_KEY');
+export function createSupabaseClient({ supabaseUrl, serviceKey, apiKey, authToken }) {
+  const restKey = apiKey || serviceKey;
+  const authHeader = authToken || (serviceKey ? `Bearer ${serviceKey}` : '');
+  if (!supabaseUrl || !restKey || !authHeader) throw new Error('缺少 Supabase 連線資訊');
   async function request(method, path, body, extraHeaders = {}) {
     const res = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
       method,
       headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+        apikey: restKey,
+        Authorization: authHeader,
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
         ...extraHeaders

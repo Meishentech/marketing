@@ -10,8 +10,6 @@ export async function onRequestPost(context) {
     if (!projectId) return json({ error: 'missing projectId' }, 400);
     const supabaseUrl = context.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
     const anonKey = context.env.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
-    const serviceKey = context.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceKey) return json({ error: 'missing SUPABASE_SERVICE_ROLE_KEY' }, 500);
 
     const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
@@ -23,7 +21,8 @@ export async function onRequestPost(context) {
 
     const result = await scanProject({
       supabaseUrl,
-      serviceKey,
+      apiKey: anonKey,
+      authToken: auth,
       projectId,
       resendApiKey: context.env.RESEND_API_KEY,
       notificationFrom: context.env.TENDER_NOTIFICATION_FROM,
