@@ -26,7 +26,7 @@ export async function onRequestPost(context) {
       projectId,
       pageLimitOverride: 1,
       maxCandidates: 8,
-      activeSearchRequestLimit: 3,
+      activeSearchRequestLimit: 5,
       fetchDetails: false,
       notify: false,
       googleSearchApiKey: context.env.GOOGLE_SEARCH_API_KEY,

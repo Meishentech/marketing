@@ -87,19 +87,22 @@ export async function scanProject(options) {
 
     const candidates = new Map();
     let checkedPages = 0;
+    let searchDiagnostics = null;
     if (project.scan_mode === '主動找案') {
       const googleSearchApiKey = options.googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY');
       const googleSearchCx = options.googleSearchCx || envVar('GOOGLE_SEARCH_CX');
       if (!googleSearchApiKey || !googleSearchCx) {
         throw new Error('主動找案尚未啟用穩定搜尋，請在 Cloudflare 設定 GOOGLE_SEARCH_API_KEY 與 GOOGLE_SEARCH_CX');
       }
+      searchDiagnostics = { source: 'Google 搜尋', queries: [], returned: 0, errors: [] };
       for (const item of await activeSearchCandidates({
         project,
         words,
         maxCandidates: options.maxCandidates || 30,
         requestLimit: options.activeSearchRequestLimit || ACTIVE_SEARCH_REQUEST_LIMIT,
         googleSearchApiKey,
-        googleSearchCx
+        googleSearchCx,
+        diagnostics: searchDiagnostics
       })) {
         if (!candidates.has(item.url)) candidates.set(item.url, item);
       }
@@ -185,7 +188,7 @@ export async function scanProject(options) {
     await sb.patch(`tender_projects?id=eq.${project.id}`, {
       last_scanned_at: startedAt,
       last_scan_status: preservedExistingResults
-        ? '成功：主動找案本次未回傳新結果，已保留既有結果'
+        ? activeSearchEmptyStatus(checkedPages, searchDiagnostics)
         : `成功：命中 ${foundCount} 筆，新發現 ${newCount} 筆`,
       updated_at: new Date().toISOString()
     });
@@ -196,7 +199,15 @@ export async function scanProject(options) {
       });
     }
 
-    return { projectId: project.id, checkedPages, foundCount, newCount, preservedExistingResults, matches: matchedRows };
+    return {
+      projectId: project.id,
+      checkedPages,
+      foundCount,
+      newCount,
+      preservedExistingResults,
+      searchDiagnostics,
+      matches: matchedRows
+    };
   } catch (err) {
     if (run?.id) {
       await sb.patch(`tender_scan_runs?id=eq.${run.id}`, {
@@ -287,19 +298,20 @@ export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
   return candidates;
 }
 
-async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT, googleSearchApiKey, googleSearchCx }) {
+async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT, googleSearchApiKey, googleSearchCx, diagnostics }) {
   const queries = activeSearchQueryPlan(activeSearchQueries(project, words));
   const googleRows = await googleSearchCandidates({
     queries,
     maxCandidates,
     requestLimit,
     apiKey: googleSearchApiKey || envVar('GOOGLE_SEARCH_API_KEY'),
-    cx: googleSearchCx || envVar('GOOGLE_SEARCH_CX')
+    cx: googleSearchCx || envVar('GOOGLE_SEARCH_CX'),
+    diagnostics
   });
   return googleRows;
 }
 
-async function googleSearchCandidates({ queries, maxCandidates, requestLimit, apiKey, cx }) {
+async function googleSearchCandidates({ queries, maxCandidates, requestLimit, apiKey, cx, diagnostics }) {
   if (!apiKey || !cx) return [];
   const seen = new Set();
   const candidates = [];
@@ -307,6 +319,7 @@ async function googleSearchCandidates({ queries, maxCandidates, requestLimit, ap
   for (const query of queries) {
     if (candidates.length >= maxCandidates) break;
     if (requestCount >= requestLimit) break;
+    diagnostics?.queries.push(query);
     const url = new URL('https://www.googleapis.com/customsearch/v1');
     url.searchParams.set('key', apiKey);
     url.searchParams.set('cx', cx);
@@ -316,11 +329,16 @@ async function googleSearchCandidates({ queries, maxCandidates, requestLimit, ap
     let data;
     try {
       const res = await fetch(url.toString(), { headers: DEFAULT_HEADERS });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        diagnostics?.errors.push(`Google ${res.status}`);
+        continue;
+      }
       data = await res.json();
     } catch {
+      diagnostics?.errors.push('Google 連線失敗');
       continue;
     }
+    diagnostics.returned += Number(data.searchInformation?.totalResults || 0) ? (data.items || []).length : 0;
     for (const item of data.items || []) {
       if (candidates.length >= maxCandidates) break;
       const link = String(item.link || '').trim();
@@ -341,18 +359,23 @@ async function googleSearchCandidates({ queries, maxCandidates, requestLimit, ap
 
 function activeSearchQueries(project, words) {
   const custom = Array.isArray(project.search_queries) ? project.search_queries.map(q => String(q || '').trim()).filter(Boolean) : [];
-  if (custom.length) return prioritizeActiveSearchQueries(custom, words).slice(0, 12);
+  const generated = generatedActiveSearchQueries(words);
+  if (custom.length) return prioritizeActiveSearchQueries([...custom, ...generated], words).slice(0, 12);
+  return generated.slice(0, 12);
+}
+
+function generatedActiveSearchQueries(words) {
   const priorityWords = (words || []).slice(0, 8);
-  const intents = ['招標', '採購', '公開招標', '投標截止'];
+  const intents = ['汰換 招標', '汰換', '替換 招標', '招標', '採購', '公開招標', '投標截止'];
   const queries = [];
   for (const word of priorityWords) {
     for (const intent of intents) queries.push(`${word} ${intent}`);
   }
-  return queries.slice(0, 12);
+  return queries;
 }
 
 function prioritizeActiveSearchQueries(queries, words = []) {
-  const businessTerms = [...new Set([...(words || []), '冰水', '冰水主機', '冰水機', '空調', '中央空調', '通風', '磁浮', '磁懸浮', '汰換'])].filter(Boolean);
+  const businessTerms = [...new Set([...(words || []), '冰水', '冰水主機', '冰水機', '空調', '中央空調', '通風', '磁浮', '磁懸浮', '汰換', '替換'])].filter(Boolean);
   return [...queries].sort((a, b) => activeQueryScore(b, businessTerms) - activeQueryScore(a, businessTerms));
 }
 
@@ -487,6 +510,14 @@ export function evaluateTenderRelevance({ text, matchedKeywords = [], scanCatego
   else if (score >= thresholds.review) level = '待確認';
 
   return { score, level, reasons, thresholds };
+}
+
+function activeSearchEmptyStatus(checkedPages, diagnostics) {
+  const queries = diagnostics?.queries?.slice(0, 5).join('、') || '未記錄';
+  const returned = diagnostics?.returned || 0;
+  const errors = diagnostics?.errors?.length ? `；錯誤：${diagnostics.errors.slice(0, 3).join('、')}` : '';
+  if (!checkedPages) return `成功：Google 搜尋回傳 0 筆候選，已保留既有結果｜查詢：${queries}${errors}`;
+  return `成功：Google 回傳 ${checkedPages} 筆候選，過濾後 0 筆，已保留既有結果｜查詢：${queries}｜原始回傳 ${returned} 筆${errors}`;
 }
 
 async function saveTenderResult(sb, method, path, payload) {
