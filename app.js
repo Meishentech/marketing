@@ -1782,7 +1782,7 @@ function assocTabs(){
     ['events','會員大會 / 協辦活動'],
     ['benefits','權益與備註']
   ];
-  return `<div class="filter-bar" style="grid-template-columns:repeat(8,minmax(120px,1fr));margin-bottom:16px">
+  return `<div class="assoc-tabs">
     ${tabs.map(([key, label]) => `<button class="btn ${ASSOC_TAB === key ? 'btn-primary' : 'btn-outline'}" onclick="setAssocTab('${key}')">${label}</button>`).join('')}
   </div>`;
 }
@@ -1825,21 +1825,24 @@ function renderAssocOverview(){
     const ev = nextAssocEvent(a.id);
     const task = nextAssocTask(a.id);
     const totals = expenseTotals(a.id);
-    return `<tr onclick="openAssociationModal('${a.id}')">
-      <td class="tb-name">${esc(a.name)}<div class="muted-text">${esc(a.association_type || '待補')}</div></td>
-      <td>${assocStatusTag(a.join_status)}</td>
-      <td>${fee ? simpleStatusTag(fee.payment_status) : '<span class="muted-text">待補</span>'}</td>
-      <td>${fdFull(fee?.due_date || '')}</td>
-      <td class="mono">${openTaskCount(a.id)}</td>
-      <td>${task ? `${fdFull(task.due_date || '')}<div class="muted-text">${esc(task.task_name)}</div>` : '<span class="muted-text">待補</span>'}</td>
-      <td>${fdFull(pub?.deadline_date || '')}${pub ? `<div class="muted-text">${esc(pub.publication_name)}</div>` : ''}</td>
-      <td>${ev ? `${fdFull(ev.event_date || '')}<div class="muted-text">${esc(ev.event_name)}</div>` : '<span class="muted-text">待補</span>'}</td>
-      <td class="mono">${unusedBenefitCount(a.id)}</td>
-      <td class="tb-amt">${fmt(totals.budget)} / ${fmt(totals.actual)}</td>
-      <td>${esc(a.internal_owner || '待補')}</td>
-      <td>${fdFull(latestAssocUpdated(a).slice(0, 10) || '')}</td>
-      <td><div class="case-tags">${assocBadges(a) || '<span class="case-tag">目前無提醒</span>'}</div></td>
-    </tr>`;
+    return `<div class="assoc-card" onclick="openAssociationModal('${a.id}')">
+      <div class="assoc-card-head">
+        <div class="assoc-card-title clamp2">${esc(a.name)}</div>
+        ${assocStatusTag(a.join_status)}
+      </div>
+      <div class="cell-sub">${esc(a.association_type || '待補')}｜負責人：${esc(a.internal_owner || '待補')}</div>
+      <div class="assoc-card-meta">
+        <div class="assoc-card-field"><div class="kpi-label">年費</div><div>${fee ? simpleStatusTag(fee.payment_status) : '<span class="muted-text">待補</span>'}<div class="cell-sub">到期 ${fdFull(fee?.due_date || '')}</div></div></div>
+        <div class="assoc-card-field"><div class="kpi-label">進行中任務</div><div class="mono">${openTaskCount(a.id)}</div><div class="cell-sub clamp2">${task ? `${fdFull(task.due_date || '')} ${esc(task.task_name)}` : '待補'}</div></div>
+        <div class="assoc-card-field"><div class="kpi-label">期刊截稿</div><div class="cell-main">${fdFull(pub?.deadline_date || '')}</div><div class="cell-sub clamp2">${pub ? esc(pub.publication_name) : '待補'}</div></div>
+        <div class="assoc-card-field"><div class="kpi-label">下一場活動</div><div class="cell-main">${ev ? fdFull(ev.event_date || '') : '待補'}</div><div class="cell-sub clamp2">${ev ? esc(ev.event_name) : '待補'}</div></div>
+      </div>
+      <div class="case-tags">${assocBadges(a) || '<span class="case-tag">目前無提醒</span>'}</div>
+      <div class="assoc-card-footer">
+        <div><div class="kpi-label">預算 / 已支出</div><div class="mono">NT$ ${fmt(totals.budget)} / ${fmt(totals.actual)}</div></div>
+        <div style="text-align:right"><div class="kpi-label">最後更新</div><div class="mono">${fdFull(latestAssocUpdated(a).slice(0, 10) || '')}</div></div>
+      </div>
+    </div>`;
   }).join('');
   return `<div class="dash-kpi-grid">
     <div class="stat-box"><div class="kpi-label">公會數</div><div class="stat-num mono">${ASSOCIATIONS.length}</div></div>
@@ -1847,10 +1850,7 @@ function renderAssocOverview(){
     <div class="stat-box"><div class="kpi-label">費用未付款</div><div class="stat-num mono">${ASSOC_EXPENSES.filter(e => ['未付款','待確認'].includes(e.payment_status)).length}</div></div>
     <div class="stat-box"><div class="kpi-label">期刊待準備</div><div class="stat-num mono">${ASSOC_PUBLICATIONS.filter(p => p.material_status !== '已刊登').length}</div></div>
   </div>
-  <div class="tw"><table>
-    <thead><tr><th>公會名稱</th><th>加入狀態</th><th>本年度年費狀態</th><th>年費到期日</th><th>進行中任務數</th><th>最近任務期限</th><th>最近期刊截稿日</th><th>下一場活動 / 會員大會</th><th>未使用權益數</th><th>預算 / 已支出</th><th>內部負責人</th><th>最後更新</th><th>狀態標籤</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>${rows ? '' : '<div class="empty">尚無公會資料，請先新增公會或執行 schema_v17_associations.sql</div>'}</div>`;
+  ${rows ? `<div class="assoc-overview-grid">${rows}</div>` : '<div class="empty">尚無公會資料，請先新增公會或執行 schema_v17_associations.sql</div>'}`;
 }
 function renderAssocDetails(){
   const rows = ASSOCIATIONS.map(a => `
@@ -1875,43 +1875,73 @@ function renderAssocDetails(){
 }
 function renderAssocTasks(){
   const rows = ASSOC_TASKS.map(t => `<tr onclick="openAssocTaskModal('${t.id}')">
-    <td class="tb-name">${esc(assocName(t.association_id))}</td><td>${esc(t.task_name)}</td><td>${esc(campaignName(t.marketing_campaign_id))}</td><td><span class="case-tag">${esc(t.task_type)}</span></td><td>${simpleStatusTag(t.task_status)}</td><td>${priorityTag(t.priority || '中')}</td><td>${fdFull(t.start_date || '')}</td><td>${fdFull(t.due_date || '')}</td><td class="mono">${Number(t.progress_pct) || 0}%</td><td>${esc(t.owner || '-')}</td><td>${esc(t.next_step || '-')}</td>
+    <td><div class="cell-main clamp2">${esc(t.task_name)}</div><div class="cell-sub clamp2">${esc(assocName(t.association_id))}</div></td>
+    <td><div class="clamp2">${esc(campaignName(t.marketing_campaign_id))}</div><div class="cell-sub">${esc(t.task_type)}</div></td>
+    <td class="status-col">${simpleStatusTag(t.task_status)}<div style="margin-top:5px">${priorityTag(t.priority || '中')}</div></td>
+    <td class="date-col"><div class="cell-main">${fdFull(t.due_date || '')}</div><div class="cell-sub">開始 ${fdFull(t.start_date || '')}</div></td>
+    <td class="narrow"><div class="mono">${Number(t.progress_pct) || 0}%</div></td>
+    <td><div class="cell-main clip">${esc(t.owner || '-')}</div><div class="cell-sub clamp2">${esc(t.next_step || '-')}</div></td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>任務名稱</th><th>關聯行銷專案</th><th>任務類型</th><th>狀態</th><th>優先級</th><th>開始日期</th><th>截止日期</th><th>進度</th><th>負責人</th><th>下一步</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql 與 schema_v20_association_task_campaign_options.sql</div>'}</div>`;
+  return `<div class="tw"><table class="assoc-table"><thead><tr><th>任務 / 公會</th><th>關聯行銷專案</th><th class="status-col">狀態</th><th class="date-col">期限</th><th class="narrow">進度</th><th>負責 / 下一步</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql 與 schema_v20_association_task_campaign_options.sql</div>'}</div>`;
 }
 function renderAssocExpenses(){
   const rows = ASSOC_EXPENSES.map(e => `<tr onclick="openAssocExpenseModal('${e.id}')">
-    <td class="tb-name">${esc(assocName(e.association_id))}</td><td>${esc(taskName(e.task_id))}</td><td><span class="case-tag">${esc(e.expense_type)}</span></td><td class="tb-amt">NT$ ${fmt(e.budget_amount)}</td><td class="tb-amt">NT$ ${fmt(e.actual_amount)}</td><td>${simpleStatusTag(e.payment_status)}</td><td>${fdFull(e.payment_date || '')}</td><td>${esc(e.receipt_status || '-')}</td><td>${esc(e.receipt_attachment || '-')}</td><td>${esc(e.notes || '-')}</td>
+    <td><div class="cell-main clamp2">${esc(assocName(e.association_id))}</div><div class="cell-sub clamp2">${esc(taskName(e.task_id))}</div></td>
+    <td class="status-col"><span class="case-tag">${esc(e.expense_type)}</span><div style="margin-top:6px">${simpleStatusTag(e.payment_status)}</div></td>
+    <td class="money-col"><div class="mono">預算 ${fmt(e.budget_amount)}</div><div class="cell-sub">實支 ${fmt(e.actual_amount)}</div></td>
+    <td><div class="cell-main">${fdFull(e.payment_date || '')}</div><div class="cell-sub clamp2">${esc(e.receipt_status || '-')}</div></td>
+    <td><div class="clamp2">${esc(e.notes || e.receipt_attachment || '-')}</div></td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>關聯任務</th><th>費用類型</th><th>預算金額</th><th>實際支出</th><th>付款狀態</th><th>付款日期</th><th>發票 / 收據</th><th>附件</th><th>備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務費用紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql</div>'}</div>`;
+  return `<div class="tw"><table class="assoc-table"><thead><tr><th>公會 / 任務</th><th class="status-col">類型 / 狀態</th><th class="money-col">金額</th><th>付款 / 收據</th><th>備註 / 附件</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務費用紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql</div>'}</div>`;
 }
 function renderAssocFees(){
   const rows = ASSOC_FEES.map(f => `<tr onclick="openAssocFeeModal('${f.id}')">
-    <td class="tb-name">${esc(assocName(f.association_id))}</td><td class="mono">${esc(f.year)}</td><td class="tb-amt">NT$ ${fmt(f.fee_amount)}</td><td>${simpleStatusTag(f.payment_status)}</td><td>${fdFull(f.payment_date || '')}</td><td>${fdFull(f.due_date || '')}</td><td>${esc(f.receipt_status || '-')}</td><td>${fdFull(f.renewal_reminder_date || '')}</td><td>${esc(f.notes || '-')}</td>
+    <td><div class="cell-main clamp2">${esc(assocName(f.association_id))}</div><div class="cell-sub mono">${esc(f.year)}</div></td>
+    <td class="money-col mono">NT$ ${fmt(f.fee_amount)}</td>
+    <td class="status-col">${simpleStatusTag(f.payment_status)}</td>
+    <td><div class="cell-main">到期 ${fdFull(f.due_date || '')}</div><div class="cell-sub">提醒 ${fdFull(f.renewal_reminder_date || '')}</div></td>
+    <td><div class="cell-main">${fdFull(f.payment_date || '')}</div><div class="cell-sub clamp2">${esc(f.receipt_status || '-')}</div></td>
+    <td><div class="clamp2">${esc(f.notes || '-')}</div></td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>年度</th><th>年費金額</th><th>繳費狀態</th><th>繳費日期</th><th>到期日</th><th>發票/收據</th><th>續會提醒</th><th>備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無年費紀錄</div>'}</div>`;
+  return `<div class="tw"><table class="assoc-table"><thead><tr><th>公會 / 年度</th><th class="money-col">年費</th><th class="status-col">狀態</th><th>到期 / 提醒</th><th>繳費 / 收據</th><th>備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無年費紀錄</div>'}</div>`;
 }
 function renderAssocBenefits(){
   const rows = ASSOC_BENEFITS.map(b => `<tr onclick="openAssocBenefitModal('${b.id}')">
-    <td class="tb-name">${esc(assocName(b.association_id))}</td><td>${esc(b.benefit_name)}</td><td><span class="case-tag">${esc(b.benefit_type)}</span></td><td>${simpleStatusTag(b.usage_status)}</td><td>${fdFull(b.valid_until || '')}</td><td>${esc(b.owner || '-')}</td><td>${esc(b.notes || b.description || '-')}</td>
+    <td><div class="cell-main clamp2">${esc(b.benefit_name)}</div><div class="cell-sub clamp2">${esc(assocName(b.association_id))}</div></td>
+    <td class="status-col"><span class="case-tag">${esc(b.benefit_type)}</span><div style="margin-top:6px">${simpleStatusTag(b.usage_status)}</div></td>
+    <td class="date-col">${fdFull(b.valid_until || '')}</td>
+    <td class="owner-col"><div class="clip">${esc(b.owner || '-')}</div></td>
+    <td><div class="clamp2">${esc(b.notes || b.description || '-')}</div></td>
   </tr>`).join('');
   const noteRows = ASSOC_NOTES.map(n => `<tr onclick="openAssocNoteModal('${n.id}')">
-    <td class="tb-name">${esc(assocName(n.association_id))}</td><td>${esc(n.note_title)}</td><td>${esc(n.owner || '-')}</td><td>${esc(n.attachment || '-')}</td><td>${esc(n.note || '-')}</td><td>${fdFull(n.updated_at?.slice(0, 10) || '')}</td>
+    <td><div class="cell-main clamp2">${esc(n.note_title)}</div><div class="cell-sub clamp2">${esc(assocName(n.association_id))}</div></td>
+    <td class="owner-col"><div class="clip">${esc(n.owner || '-')}</div></td>
+    <td><div class="clamp2">${esc(n.attachment || '-')}</div></td>
+    <td><div class="clamp2">${esc(n.note || '-')}</div></td>
+    <td class="date-col">${fdFull(n.updated_at?.slice(0, 10) || '')}</td>
   </tr>`).join('');
-  return `<div class="card" style="margin-bottom:16px"><div class="dash-panel-head"><div><div class="dash-panel-title">會員權益</div><div class="muted-text">期刊曝光、活動參與、協辦活動、會員名錄與課程講座</div></div></div><div class="tw"><table><thead><tr><th>公會</th><th>權益名稱</th><th>權益類型</th><th>使用狀態</th><th>有效期限</th><th>負責人</th><th>說明/備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員權益紀錄</div>'}</div></div>
-  <div class="card"><div class="dash-panel-head"><div><div class="dash-panel-title">備註與附件</div><div class="muted-text">記錄跨年度待補事項、雲端連結、檔名或附件存放位置</div></div><button class="btn btn-sm btn-primary" onclick="openAssocNoteModal()">＋ 新增備註</button></div><div class="tw"><table><thead><tr><th>公會</th><th>備註標題</th><th>負責人</th><th>附件欄位</th><th>備註內容</th><th>最後更新</th></tr></thead><tbody>${noteRows}</tbody></table>${noteRows ? '' : '<div class="empty">尚無備註附件紀錄；若儲存時出現錯誤，請先執行 schema_v18_association_notes.sql</div>'}</div></div>`;
+  return `<div class="card" style="margin-bottom:16px"><div class="dash-panel-head"><div><div class="dash-panel-title">會員權益</div><div class="muted-text">期刊曝光、活動參與、協辦活動、會員名錄與課程講座</div></div></div><div class="tw"><table class="assoc-table"><thead><tr><th>權益 / 公會</th><th class="status-col">類型 / 狀態</th><th class="date-col">有效期限</th><th class="owner-col">負責人</th><th>說明 / 備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員權益紀錄</div>'}</div></div>
+  <div class="card"><div class="dash-panel-head"><div><div class="dash-panel-title">備註與附件</div><div class="muted-text">記錄跨年度待補事項、雲端連結、檔名或附件存放位置</div></div><button class="btn btn-sm btn-primary" onclick="openAssocNoteModal()">＋ 新增備註</button></div><div class="tw"><table class="assoc-table"><thead><tr><th>備註 / 公會</th><th class="owner-col">負責人</th><th>附件欄位</th><th>備註內容</th><th class="date-col">最後更新</th></tr></thead><tbody>${noteRows}</tbody></table>${noteRows ? '' : '<div class="empty">尚無備註附件紀錄；若儲存時出現錯誤，請先執行 schema_v18_association_notes.sql</div>'}</div></div>`;
 }
 function renderAssocPublications(){
   const rows = ASSOC_PUBLICATIONS.map(p => `<tr onclick="openAssocPubModal('${p.id}')">
-    <td class="tb-name">${esc(assocName(p.association_id))}</td><td>${esc(taskName(p.task_id))}</td><td>${esc(p.publication_name)}</td><td>${fdFull(p.publish_date || '')}</td><td>${fdFull(p.deadline_date || '')}</td><td>${esc(p.topic || '-')}</td><td>${esc(joinList(p.required_materials) || '-')}</td><td>${simpleStatusTag(p.material_status)}</td><td>${esc(p.owner || '-')}</td><td>${fdFull(p.submission_date || '')}</td>
+    <td><div class="cell-main clamp2">${esc(p.publication_name)}</div><div class="cell-sub clamp2">${esc(assocName(p.association_id))}｜${esc(taskName(p.task_id))}</div></td>
+    <td><div class="cell-main">截稿 ${fdFull(p.deadline_date || '')}</div><div class="cell-sub">發刊 ${fdFull(p.publish_date || '')}</div></td>
+    <td><div class="clamp2">${esc(p.topic || '-')}</div><div class="cell-sub clamp2">${esc(joinList(p.required_materials) || '-')}</div></td>
+    <td class="status-col">${simpleStatusTag(p.material_status)}</td>
+    <td class="owner-col"><div class="clip">${esc(p.owner || '-')}</div><div class="cell-sub">${fdFull(p.submission_date || '')}</div></td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>關聯任務</th><th>期刊名稱</th><th>發刊日期</th><th>截稿日期</th><th>主題</th><th>所需素材</th><th>素材狀態</th><th>負責人</th><th>送件日期</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無期刊排程</div>'}</div>`;
+  return `<div class="tw"><table class="assoc-table"><thead><tr><th>期刊 / 公會任務</th><th>日期</th><th>主題 / 素材</th><th class="status-col">素材狀態</th><th class="owner-col">負責 / 送件</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無期刊排程</div>'}</div>`;
 }
 function renderAssocEvents(){
   const rows = ASSOC_EVENTS.map(e => `<tr onclick="openAssocEventModal('${e.id}')">
-    <td class="tb-name">${esc(assocName(e.association_id))}</td><td>${esc(taskName(e.task_id))}</td><td>${esc(e.event_name)}</td><td><span class="case-tag">${esc(e.event_type)}</span></td><td>${fdFull(e.event_date || '')}</td><td>${esc(e.location || '-')}</td><td>${esc(e.meisun_role || '-')}</td><td class="tb-amt">NT$ ${fmt(e.budget)}</td><td class="tb-amt">NT$ ${fmt(e.actual_spend)}</td><td>${simpleStatusTag(e.event_status)}</td><td>${esc(e.owner || '-')}</td>
+    <td><div class="cell-main clamp2">${esc(e.event_name)}</div><div class="cell-sub clamp2">${esc(assocName(e.association_id))}｜${esc(taskName(e.task_id))}</div></td>
+    <td class="status-col"><span class="case-tag">${esc(e.event_type)}</span><div style="margin-top:6px">${simpleStatusTag(e.event_status)}</div></td>
+    <td><div class="cell-main">${fdFull(e.event_date || '')}</div><div class="cell-sub clamp2">${esc(e.location || '-')}</div></td>
+    <td><div class="cell-main">${esc(e.meisun_role || '-')}</div><div class="cell-sub clip">${esc(e.owner || '-')}</div></td>
+    <td class="money-col"><div class="mono">預算 ${fmt(e.budget)}</div><div class="cell-sub">實支 ${fmt(e.actual_spend)}</div></td>
   </tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>公會</th><th>關聯任務</th><th>活動名稱</th><th>類型</th><th>日期</th><th>地點</th><th>美昇角色</th><th>預算</th><th>實際支出</th><th>狀態</th><th>負責人</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員大會 / 活動紀錄</div>'}</div>`;
+  return `<div class="tw"><table class="assoc-table"><thead><tr><th>活動 / 公會任務</th><th class="status-col">類型 / 狀態</th><th>日期 / 地點</th><th>角色 / 負責</th><th class="money-col">費用</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員大會 / 活動紀錄</div>'}</div>`;
 }
 
 function openAssociationModal(id){

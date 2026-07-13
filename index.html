@@ -195,6 +195,28 @@ tbody tr:hover td{background:#F5F8F6}
 tbody tr:last-child td{border-bottom:none}
 .tb-name{font-weight:600}
 .tb-amt{white-space:nowrap;font-size:15px}
+.clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45}
+.cell-main{font-weight:600;line-height:1.35}
+.cell-sub{font-size:13px;color:var(--muted);line-height:1.45;margin-top:3px}
+.assoc-tabs{display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px}
+.assoc-tabs .btn{white-space:nowrap;flex:0 0 auto}
+.assoc-overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.assoc-card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--teal);padding:15px 16px;cursor:pointer;min-width:0}
+.assoc-card:hover{background:#F5F8F6;border-color:var(--teal)}
+.assoc-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.assoc-card-title{font-size:17px;font-weight:700;line-height:1.35;min-width:0}
+.assoc-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.assoc-card-field{min-width:0}
+.assoc-card-field .kpi-label{margin-bottom:3px}
+.assoc-card-footer{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
+.assoc-table{table-layout:fixed}
+.assoc-table td{font-size:15px;vertical-align:top}
+.assoc-table .narrow{width:96px}
+.assoc-table .date-col{width:118px}
+.assoc-table .money-col{width:128px}
+.assoc-table .status-col{width:132px}
+.assoc-table .owner-col{width:120px}
 
 /* 詳情頁 */
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -257,6 +279,9 @@ tbody tr:last-child td{border-bottom:none}
   .follow-grid,.follow-list{grid-template-columns:1fr}
   .dash-grid{grid-template-columns:1fr}
   .detail-grid{grid-template-columns:1fr}
+  .assoc-overview-grid{grid-template-columns:1fr}
+  .assoc-card-meta{grid-template-columns:1fr}
+  .assoc-card-footer{align-items:flex-start;flex-direction:column}
   .kpi-strip{gap:14px}
   .kpi-seg{border-left:none;padding-left:0;min-width:45%}
   .gantt-row{grid-template-columns:110px 1fr}
