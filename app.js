@@ -3146,11 +3146,16 @@ async function saveTenderProject(){
   const scanMode = document.getElementById('tpm-scan-mode').value || '指定網址';
   const sourceUrl = document.getElementById('tpm-url').value.trim();
   if (!name || (scanMode === '指定網址' && !sourceUrl)) { alert('請輸入專案名稱與網址'); return; }
+  const searchQueries = parseTenderSearchQueries();
+  if (scanMode === '主動找案' && !searchQueries.length && !TENDER_KEYWORDS.some(k => k.project_id === editTenderProjectId && k.is_active)) {
+    alert('主動找案請至少填一組搜尋指令，或先建立啟用中的關鍵字。');
+    return;
+  }
   const payload = {
     name,
     scan_mode: scanMode,
     source_url: scanMode === '主動找案' ? 'active-search://default' : sourceUrl,
-    search_queries: parseTenderSearchQueries(),
+    search_queries: searchQueries,
     page_limit: Math.max(1, Math.min(Number(document.getElementById('tpm-limit').value) || 1, 10)),
     filter_mode: document.getElementById('tpm-filter-mode').value || '保守',
     scan_categories: selectedTenderCategories(),
