@@ -94,7 +94,7 @@ export async function scanProject(options) {
       if (!googleSearchApiKey || !googleSearchCx) {
         throw new Error('主動找案尚未啟用穩定搜尋，請在 Cloudflare 設定 GOOGLE_SEARCH_API_KEY 與 GOOGLE_SEARCH_CX');
       }
-      searchDiagnostics = { source: 'Google 搜尋', queries: [], returned: 0, errors: [] };
+      searchDiagnostics = { source: 'Google 搜尋', queries: [], returned: 0, totalResults: 0, errors: [] };
       for (const item of await activeSearchCandidates({
         project,
         words,
@@ -339,6 +339,7 @@ async function googleSearchCandidates({ queries, maxCandidates, requestLimit, ap
       continue;
     }
     diagnostics.returned += Number(data.searchInformation?.totalResults || 0) ? (data.items || []).length : 0;
+    diagnostics.totalResults += Number(data.searchInformation?.totalResults || 0);
     for (const item of data.items || []) {
       if (candidates.length >= maxCandidates) break;
       const link = String(item.link || '').trim();
@@ -515,9 +516,10 @@ export function evaluateTenderRelevance({ text, matchedKeywords = [], scanCatego
 function activeSearchEmptyStatus(checkedPages, diagnostics) {
   const queries = diagnostics?.queries?.slice(0, 5).join('、') || '未記錄';
   const returned = diagnostics?.returned || 0;
+  const totalResults = diagnostics?.totalResults || 0;
   const errors = diagnostics?.errors?.length ? `；錯誤：${diagnostics.errors.slice(0, 3).join('、')}` : '';
-  if (!checkedPages) return `成功：Google 搜尋回傳 0 筆候選，已保留既有結果｜查詢：${queries}${errors}`;
-  return `成功：Google 回傳 ${checkedPages} 筆候選，過濾後 0 筆，已保留既有結果｜查詢：${queries}｜原始回傳 ${returned} 筆${errors}`;
+  if (!checkedPages) return `成功：Google 搜尋回傳 0 筆候選，已保留既有結果｜查詢：${queries}｜Google total ${totalResults}${errors}`;
+  return `成功：Google 回傳 ${checkedPages} 筆候選，過濾後 0 筆，已保留既有結果｜查詢：${queries}｜原始回傳 ${returned} 筆｜Google total ${totalResults}${errors}`;
 }
 
 async function saveTenderResult(sb, method, path, payload) {

@@ -3242,9 +3242,13 @@ async function scanTenderProject(id){
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `掃描失敗 ${res.status}`);
-    const searchedQueries = data.searchDiagnostics?.queries?.slice(0, 5).join('、');
+    const sd = data.searchDiagnostics || {};
+    const searchedQueries = sd.queries?.slice(0, 5).join('、');
+    const diagnosticText = sd.source
+      ? `\nGoogle 候選：${data.checkedPages || 0} 筆｜原始回傳：${sd.returned || 0} 筆｜Total：${sd.totalResults || 0}${sd.errors?.length ? `\n錯誤：${sd.errors.slice(0, 3).join('、')}` : ''}`
+      : '';
     alert(data.preservedExistingResults
-      ? `掃描完成：本次主動找案未回傳新結果，已保留既有結果。${searchedQueries ? `\n查詢：${searchedQueries}` : ''}`
+      ? `掃描完成：本次主動找案未回傳新結果，已保留既有結果。${diagnosticText}${searchedQueries ? `\n查詢：${searchedQueries}` : ''}`
       : `掃描完成：命中 ${data.foundCount} 筆，新發現 ${data.newCount} 筆`);
     await renderTendersPage();
   } catch (e) {
