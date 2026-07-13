@@ -3242,7 +3242,9 @@ async function scanTenderProject(id){
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `掃描失敗 ${res.status}`);
-    alert(`掃描完成：命中 ${data.foundCount} 筆，新發現 ${data.newCount} 筆`);
+    alert(data.preservedExistingResults
+      ? '掃描完成：本次主動找案未回傳新結果，已保留既有結果。'
+      : `掃描完成：命中 ${data.foundCount} 筆，新發現 ${data.newCount} 筆`);
     await renderTendersPage();
   } catch (e) {
     alert(`掃描失敗：${e.message}\n請確認已登入平台，且已執行投標工具 SQL。`);

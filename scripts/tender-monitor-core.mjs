@@ -33,6 +33,8 @@ const FILTER_THRESHOLDS = {
   '嚴格': { high: 85, review: 45 }
 };
 
+const ACTIVE_SEARCH_REQUEST_LIMIT = 12;
+
 export function createSupabaseClient({ supabaseUrl, serviceKey, apiKey, authToken }) {
   const restKey = apiKey || serviceKey;
   const authHeader = authToken || (serviceKey ? `Bearer ${serviceKey}` : '');
@@ -124,8 +126,10 @@ export async function scanProject(options) {
       if (project.scan_mode !== '主動找案' && !matchedKeywords.length) continue;
       if (project.scan_mode === '主動找案' && !matchedKeywords.length && relevance.score < relevance.thresholds.review) continue;
 
+      const publishedAt = extractPublishedDate(`${detailText}\n${item.pageText || ''}\n${title}`);
+      if (project.scan_mode === '主動找案' && isStaleActiveSearchResult(haystack, publishedAt)) continue;
+
       foundCount++;
-      const publishedAt = extractPublishedDate(detailText);
       const snippet = makeSnippet(haystack, matchedKeywords[0]);
       const existing = await sb.get(`tender_results?project_id=eq.${project.id}&url=eq.${encodeURIComponent(item.url)}&select=id`);
       const resultPayload = {
@@ -154,7 +158,8 @@ export async function scanProject(options) {
       matchedRows.push({ title, url: item.url, publishedAt, matchedKeywords, snippet, relevance });
     }
 
-    if (foundCount === 0) {
+    const preservedExistingResults = foundCount === 0 && project.scan_mode === '主動找案';
+    if (foundCount === 0 && project.scan_mode !== '主動找案') {
       await sb.del(`tender_results?project_id=eq.${project.id}`).catch(() => {});
     }
 
@@ -167,7 +172,9 @@ export async function scanProject(options) {
     });
     await sb.patch(`tender_projects?id=eq.${project.id}`, {
       last_scanned_at: startedAt,
-      last_scan_status: `成功：命中 ${foundCount} 筆，新發現 ${newCount} 筆`,
+      last_scan_status: preservedExistingResults
+        ? '成功：主動找案本次未回傳新結果，已保留既有結果'
+        : `成功：命中 ${foundCount} 筆，新發現 ${newCount} 筆`,
       updated_at: new Date().toISOString()
     });
 
@@ -177,7 +184,7 @@ export async function scanProject(options) {
       });
     }
 
-    return { projectId: project.id, checkedPages, foundCount, newCount, matches: matchedRows };
+    return { projectId: project.id, checkedPages, foundCount, newCount, preservedExistingResults, matches: matchedRows };
   } catch (err) {
     if (run?.id) {
       await sb.patch(`tender_scan_runs?id=eq.${run.id}`, {
@@ -272,17 +279,23 @@ async function activeSearchCandidates({ project, words, maxCandidates = 30 }) {
   const queries = activeSearchQueries(project, words);
   const seen = new Set();
   const candidates = [];
+  let requestCount = 0;
   for (const query of queries) {
     if (candidates.length >= maxCandidates) break;
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    let html = '';
-    try { html = await fetchHtml(url); }
-    catch { continue; }
-    for (const item of extractSearchResultLinks(html, url)) {
+    for (const searchQuery of activeSearchQueryVariants(query)) {
       if (candidates.length >= maxCandidates) break;
-      if (seen.has(item.url)) continue;
-      seen.add(item.url);
-      candidates.push(item);
+      if (requestCount >= ACTIVE_SEARCH_REQUEST_LIMIT) return candidates;
+      const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
+      let html = '';
+      requestCount++;
+      try { html = await fetchHtml(url); }
+      catch { continue; }
+      for (const item of extractSearchResultLinks(html, url)) {
+        if (candidates.length >= maxCandidates) break;
+        if (seen.has(item.url)) continue;
+        seen.add(item.url);
+        candidates.push(item);
+      }
     }
   }
   return candidates;
@@ -298,6 +311,19 @@ function activeSearchQueries(project, words) {
     for (const intent of intents) queries.push(`${word} ${intent}`);
   }
   return queries.slice(0, 12);
+}
+
+function activeSearchQueryVariants(query) {
+  const base = String(query || '').trim();
+  if (!base) return [];
+  const year = new Date().getFullYear();
+  const rocYear = year - 1911;
+  const variants = [base];
+  if (!base.includes(String(year)) && !base.includes(String(rocYear))) {
+    variants.unshift(`${base} ${year}`);
+    variants.push(`${base} ${rocYear}年`);
+  }
+  return variants;
 }
 
 function inferWordsFromSearchQueries(project) {
@@ -440,9 +466,52 @@ function extractTitle(html) {
 }
 
 function extractPublishedDate(text) {
-  const m = text.match(/(?:張貼日期|公告日期|發佈日期|發布日期|刊登日期)[:：\s]*(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
-  if (!m) return null;
-  return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  const labeled = String(text || '').match(/(?:張貼日期|公告日期|發佈日期|發布日期|刊登日期|開標日期|截止日期|投標截止)[:：\s]*(?:(\d{4})|民國\s*(\d{2,3})|(\d{2,3}))[\/.\-年](\d{1,2})[\/.\-月](\d{1,2})/);
+  if (labeled) {
+    const year = normalizeTenderYear(labeled[1] || labeled[2] || labeled[3]);
+    return formatTenderDate(year, labeled[4], labeled[5]);
+  }
+  return extractTenderDates(text)[0] || null;
+}
+
+function isStaleActiveSearchResult(text, publishedAt) {
+  const dates = publishedAt ? [publishedAt, ...extractTenderDates(text)] : extractTenderDates(text);
+  if (!dates.length) return false;
+  const latest = dates
+    .map(d => new Date(`${d}T00:00:00+08:00`))
+    .filter(d => !Number.isNaN(d.getTime()))
+    .sort((a, b) => b - a)[0];
+  if (!latest) return false;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 180);
+  return latest < cutoff;
+}
+
+function extractTenderDates(text) {
+  const dates = [];
+  const body = String(text || '');
+  const re = /(?:(20\d{2})|民國\s*(\d{2,3})|(?<!\d)(1\d{2})(?!\d))[\/.\-年](\d{1,2})[\/.\-月](\d{1,2})(?:日)?/g;
+  let m;
+  while ((m = re.exec(body))) {
+    const year = normalizeTenderYear(m[1] || m[2] || m[3]);
+    const iso = formatTenderDate(year, m[4], m[5]);
+    if (iso) dates.push(iso);
+  }
+  return [...new Set(dates)];
+}
+
+function normalizeTenderYear(rawYear) {
+  const year = Number(rawYear);
+  if (!year) return 0;
+  return year < 1911 ? year + 1911 : year;
+}
+
+function formatTenderDate(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 function makeSnippet(text, keyword) {
