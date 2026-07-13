@@ -335,7 +335,6 @@ async function pccTenderCandidates({ project, words, maxCandidates, requestLimit
 }
 
 function pccTenderSearchUrl(term) {
-  const { start, end } = pccDateRange();
   const url = new URL('https://web.pcc.gov.tw/prkms/tender/common/basic/readTenderBasic');
   Object.entries({
     pageSize: '50',
@@ -343,32 +342,17 @@ function pccTenderSearchUrl(term) {
     searchType: 'basic',
     isBinding: 'N',
     isLogIn: 'N',
-    level_22: 'on',
     orgName: '',
     orgId: '',
     tenderName: term,
     tenderId: '',
     tenderType: 'TENDER_DECLARATION',
     tenderWay: 'TENDER_WAY_ALL_DECLARATION',
-    dateType: 'isDate',
-    tenderStartDate: start,
-    tenderEndDate: end,
+    dateType: 'isSpdt',
     radProctrgCate: '',
     policyAdvocacy: ''
   }).forEach(([key, value]) => url.searchParams.set(key, value));
   return url.toString();
-}
-
-function pccDateRange() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 180);
-  return { start: formatRocDate(start), end: formatRocDate(end) };
-}
-
-function formatRocDate(date) {
-  const year = date.getFullYear() - 1911;
-  return `${year}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function pccSearchTerms(project, words = []) {
@@ -417,12 +401,12 @@ function parsePccTenderRows(html, baseUrl, query) {
   while ((rowMatch = rowRe.exec(table))) {
     const cells = [...rowMatch[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m => m[1]);
     if (cells.length < 8) continue;
-    const linkMatch = cells[2]?.match(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+    const linkMatch = rowMatch[1].match(/<a\b[^>]*href=["']([^"']*\/prkms\/urlSelector\/common\/tpam[^"']*)["'][^>]*>/i);
     if (!linkMatch) continue;
     const url = normalizeCandidateUrl(new URL(decodeHtml(linkMatch[1]), baseUrl).toString());
-    const title = cleanText(htmlToText(linkMatch[2]) || htmlToText(cells[2]));
+    const title = extractPccTenderTitle(rowMatch[1], cells[2]);
     const org = cleanText(htmlToText(cells[1]));
-    const tenderNo = cleanText(htmlToText(cells[2]).replace(title, ''));
+    const tenderNo = cleanText(htmlToText(cells[2])).split(' ')[0] || '';
     const tenderWay = cleanText(htmlToText(cells[4]));
     const procurementType = cleanText(htmlToText(cells[5]));
     const published = cleanText(htmlToText(cells[6]));
@@ -446,6 +430,23 @@ function parsePccTenderRows(html, baseUrl, query) {
     });
   }
   return rows;
+}
+
+function extractPccTenderTitle(rowHtml, titleCell) {
+  const encodedScriptTitle = titleCell?.match(/pageCode2Img\("((?:\\.|[^"\\])*)"\)/)?.[1];
+  if (encodedScriptTitle) return cleanText(decodeJsString(encodedScriptTitle));
+  const titleAttr = rowHtml.match(/title=["'][^"']*標案名稱[:：]\s*([^"']+)["']/i)?.[1];
+  if (titleAttr) return cleanText(decodeHtml(titleAttr));
+  return cleanText(htmlToText(titleCell));
+}
+
+function decodeJsString(s) {
+  return decodeHtml(String(s || '')
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, ' ')
+    .replace(/\\r/g, ' ')
+    .replace(/\\t/g, ' ')
+    .replace(/\\\\/g, '\\'));
 }
 
 function activeSearchQueries(project, words) {
