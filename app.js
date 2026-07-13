@@ -1826,6 +1826,19 @@ function allAssociationEvents(associationId){
     ...ASSOC_EVENTS.filter(e => e.association_id === associationId).map(e => ({ ...e, source: 'association' }))
   ];
 }
+function campaignTaskSummary(campaignId){
+  const tasks = CAMPAIGN_TASKS_ALL.filter(t => t.campaign_id === campaignId);
+  const open = tasks.filter(t => t.status !== '已完成');
+  const next = [...open].sort((a, b) => String(a.planned_end || a.planned_start || '9999').localeCompare(String(b.planned_end || b.planned_start || '9999')))[0];
+  const avg = tasks.length ? Math.round(tasks.reduce((sum, t) => sum + (Number(t.completion_pct) || 0), 0) / tasks.length) : 0;
+  return { tasks, open, next, avg };
+}
+function campaignExpenseSummary(campaignId){
+  const items = CAMPAIGN_BUDGET_ITEMS_ALL.filter(b => b.campaign_id === campaignId);
+  const total = items.reduce((sum, b) => sum + (Number(b.amount_twd) || 0), 0);
+  const pending = items.filter(b => /待|估算|未/.test(`${b.quote_status || ''}${b.budget_nature || ''}`));
+  return { items, total, pending };
+}
 async function openCampaignTaskFromAssoc(campaignId, taskId){
   await campaignDetail(campaignId);
   openTaskModal(taskId);
@@ -2081,25 +2094,63 @@ function renderAssocDetails(){
   return rows || '<div class="empty">尚無公會資料</div>';
 }
 function renderAssocTasks(){
-  const rows = ASSOCIATIONS.flatMap(a => allAssociationTasks(a.id)).map(t => `<tr onclick="${t.source === 'campaign' ? `openCampaignTaskFromAssoc('${t.campaign_id}','${t.id}')` : `openAssocTaskModal('${t.id}')`}">
-    <td><div class="cell-main clamp2">${esc(t.task_name)}</div><div class="cell-sub clamp2">${esc(assocName(t.association_id))}</div></td>
-    <td><div class="clamp2">${esc(campaignName(t.marketing_campaign_id))}</div><div class="cell-sub">${esc(t.task_type)}｜${t.source === 'campaign' ? '行銷案同步' : '公會專屬'}</div></td>
-    <td class="status-col">${simpleStatusTag(t.task_status)}<div style="margin-top:5px">${priorityTag(t.priority || '中')}</div></td>
-    <td class="date-col"><div class="cell-main">${fdFull(t.due_date || '')}</div><div class="cell-sub">開始 ${fdFull(t.start_date || '')}</div></td>
-    <td class="narrow"><div class="mono">${Number(t.progress_pct) || 0}%</div></td>
-    <td><div class="cell-main clip">${esc(t.owner || '-')}</div><div class="cell-sub clamp2">${esc(t.next_step || '-')}</div></td>
-  </tr>`).join('');
-  return `<div class="tw"><table class="assoc-table"><thead><tr><th>任務 / 公會</th><th>關聯行銷專案</th><th class="status-col">狀態</th><th class="date-col">期限</th><th class="narrow">進度</th><th>負責 / 下一步</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql 與 schema_v20_association_task_campaign_options.sql</div>'}</div>`;
+  const sections = ASSOCIATIONS.map(a => {
+    const campaignRows = associationCampaigns(a.id).map(c => {
+      const summary = campaignTaskSummary(c.id);
+      const nextDate = summary.next?.planned_end || summary.next?.planned_start || c.planned_end || c.planned_start;
+      return `<tr onclick="campaignDetail('${c.id}')">
+        <td><div class="cell-main clamp2">${esc(c.name)}</div><div class="cell-sub">${esc(c.association_activity_type || '公會行銷案')}｜點選查看專案說明</div></td>
+        <td class="status-col">${tag(c.status)}<div style="margin-top:5px">${priorityTag(c.priority || '中')}</div></td>
+        <td><div class="cell-main">待辦 ${summary.open.length} / 全部 ${summary.tasks.length}</div><div class="cell-sub clamp2">下一步：${esc(summary.next?.task_name || c.purpose || '待補')}</div></td>
+        <td class="date-col"><div class="cell-main">${fdFull(nextDate || '')}</div><div class="cell-sub">進度 ${summary.avg}%</div></td>
+        <td><div class="cell-main clip">${esc(c.owner || '未指定')}</div><div class="cell-sub clamp2">${esc(c.owner_unit || '-')}</div></td>
+      </tr>`;
+    }).join('');
+    const nativeRows = assocTasks(a.id).map(t => `<tr onclick="openAssocTaskModal('${t.id}')">
+      <td><div class="cell-main clamp2">${esc(t.task_name)}</div><div class="cell-sub">公會專屬任務｜未關聯行銷案</div></td>
+      <td class="status-col">${simpleStatusTag(t.task_status)}<div style="margin-top:5px">${priorityTag(t.priority || '中')}</div></td>
+      <td><div class="cell-main">${esc(t.task_type || '任務')}</div><div class="cell-sub clamp2">下一步：${esc(t.next_step || '待補')}</div></td>
+      <td class="date-col"><div class="cell-main">${fdFull(t.due_date || '')}</div><div class="cell-sub">進度 ${Number(t.progress_pct) || 0}%</div></td>
+      <td><div class="cell-main clip">${esc(t.owner || '-')}</div><div class="cell-sub">開始 ${fdFull(t.start_date || '')}</div></td>
+    </tr>`).join('');
+    const rows = campaignRows + nativeRows;
+    return `<div class="card" style="margin-bottom:16px">
+      <div class="dash-panel-head">
+        <div><div class="dash-panel-title">${esc(a.name)}</div><div class="muted-text">以行銷案為主顯示；點選行銷案進入專案說明與任務明細</div></div>
+      </div>
+      <div class="tw"><table class="assoc-table"><thead><tr><th>行銷案 / 類型</th><th class="status-col">狀態</th><th>任務摘要</th><th class="date-col">期限 / 進度</th><th>負責 / 單位</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無關聯行銷案或公會專屬任務</div>'}</div>
+    </div>`;
+  }).join('');
+  return sections || '<div class="empty">尚無任務紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql 與 schema_v20_association_task_campaign_options.sql</div>';
 }
 function renderAssocExpenses(){
-  const rows = ASSOCIATIONS.flatMap(a => allAssociationExpenses(a.id)).map(e => `<tr onclick="${e.source === 'campaign' ? `openCampaignBudgetFromAssoc('${e.campaign_id}','${e.id}')` : `openAssocExpenseModal('${e.id}')`}">
-    <td><div class="cell-main clamp2">${esc(assocName(e.association_id))}</div><div class="cell-sub clamp2">${esc(e.source === 'campaign' ? campaignName(e.marketing_campaign_id) : taskName(e.task_id))}</div></td>
-    <td class="status-col"><span class="case-tag">${esc(e.expense_type)}</span><div style="margin-top:6px">${simpleStatusTag(e.payment_status)}</div><div class="cell-sub">${e.source === 'campaign' ? '行銷案同步' : '公會專屬'}</div></td>
-    <td class="money-col"><div class="mono">預算 ${fmt(e.budget_amount)}</div><div class="cell-sub">實支 ${fmt(e.actual_amount)}</div></td>
-    <td><div class="cell-main">${fdFull(e.payment_date || '')}</div><div class="cell-sub clamp2">${esc(e.receipt_status || '-')}</div></td>
-    <td><div class="clamp2">${esc(e.notes || e.receipt_attachment || '-')}</div></td>
-  </tr>`).join('');
-  return `<div class="tw"><table class="assoc-table"><thead><tr><th>公會 / 任務</th><th class="status-col">類型 / 狀態</th><th class="money-col">金額</th><th>付款 / 收據</th><th>備註 / 附件</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無任務費用紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql</div>'}</div>`;
+  const sections = ASSOCIATIONS.map(a => {
+    const campaignRows = associationCampaigns(a.id).map(c => {
+      const expenses = campaignExpenseSummary(c.id);
+      return `<tr onclick="campaignDetail('${c.id}')">
+        <td><div class="cell-main clamp2">${esc(c.name)}</div><div class="cell-sub">${esc(c.association_activity_type || '公會行銷案')}｜點選查看預算明細</div></td>
+        <td class="money-col"><div class="mono">內估 ${fmt(c.budget)}</div><div class="cell-sub">實支 ${fmt(c.actual_spend)}</div></td>
+        <td><div class="cell-main">預算項目 ${expenses.items.length} 筆</div><div class="cell-sub">明細合計 ${fmt(expenses.total)}｜待確認 ${expenses.pending.length} 筆</div></td>
+        <td class="money-col"><div class="mono">預估補助 ${fmt(c.subsidy_planned)}</div><div class="cell-sub">實際補助 ${fmt(c.subsidy_received)}</div></td>
+        <td class="status-col">${subsidyStateTag(c)}<div class="cell-sub clip">${esc(c.midea_budget_code || c.claim_status || '待補')}</div></td>
+      </tr>`;
+    }).join('');
+    const nativeRows = assocExpenses(a.id).map(e => `<tr onclick="openAssocExpenseModal('${e.id}')">
+      <td><div class="cell-main clamp2">${esc(taskName(e.task_id))}</div><div class="cell-sub">公會專屬費用｜未關聯行銷案</div></td>
+      <td class="money-col"><div class="mono">預算 ${fmt(e.budget_amount)}</div><div class="cell-sub">實支 ${fmt(e.actual_amount)}</div></td>
+      <td><div class="cell-main">${esc(e.expense_type || '費用')}</div><div class="cell-sub">${simpleStatusTag(e.payment_status)}</div></td>
+      <td><div class="cell-main">${fdFull(e.payment_date || '')}</div><div class="cell-sub clamp2">${esc(e.receipt_status || '-')}</div></td>
+      <td><div class="clamp2">${esc(e.notes || e.receipt_attachment || '-')}</div></td>
+    </tr>`).join('');
+    const rows = campaignRows + nativeRows;
+    return `<div class="card" style="margin-bottom:16px">
+      <div class="dash-panel-head">
+        <div><div class="dash-panel-title">${esc(a.name)}</div><div class="muted-text">以行銷案彙總費用、預算項目與美的補助</div></div>
+      </div>
+      <div class="tw"><table class="assoc-table"><thead><tr><th>行銷案 / 類型</th><th class="money-col">內估 / 實支</th><th>預算項目</th><th class="money-col">補助</th><th class="status-col">申請狀態</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無關聯行銷案或公會專屬費用</div>'}</div>
+    </div>`;
+  }).join('');
+  return sections || '<div class="empty">尚無任務費用紀錄；若儲存時出現錯誤，請先執行 schema_v19_association_tasks_expenses.sql</div>';
 }
 function renderAssocFees(){
   const rows = ASSOC_FEES.map(f => `<tr onclick="openAssocFeeModal('${f.id}')">
@@ -2141,14 +2192,34 @@ function renderAssocPublications(){
   return `<div class="tw"><table class="assoc-table"><thead><tr><th>期刊 / 公會任務</th><th>日期</th><th>主題 / 素材</th><th class="status-col">素材狀態</th><th class="owner-col">負責 / 送件</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無期刊排程</div>'}</div>`;
 }
 function renderAssocEvents(){
-  const rows = ASSOCIATIONS.flatMap(a => allAssociationEvents(a.id)).map(e => `<tr onclick="${e.source === 'campaign' ? `campaignDetail('${e.id}')` : `openAssocEventModal('${e.id}')`}">
-    <td><div class="cell-main clamp2">${esc(e.event_name)}</div><div class="cell-sub clamp2">${esc(assocName(e.association_id))}｜${esc(taskName(e.task_id))}</div></td>
-    <td class="status-col"><span class="case-tag">${esc(e.event_type)}</span><div style="margin-top:6px">${simpleStatusTag(e.event_status)}</div><div class="cell-sub">${e.source === 'campaign' ? '行銷案同步' : '公會專屬'}</div></td>
-    <td><div class="cell-main">${fdFull(e.event_date || '')}</div><div class="cell-sub clamp2">${esc(e.location || '-')}</div></td>
-    <td><div class="cell-main">${esc(e.meisun_role || '-')}</div><div class="cell-sub clip">${esc(e.owner || '-')}</div></td>
-    <td class="money-col"><div class="mono">預算 ${fmt(e.budget)}</div><div class="cell-sub">實支 ${fmt(e.actual_spend)}</div></td>
-  </tr>`).join('');
-  return `<div class="tw"><table class="assoc-table"><thead><tr><th>活動 / 公會任務</th><th class="status-col">類型 / 狀態</th><th>日期 / 地點</th><th>角色 / 負責</th><th class="money-col">費用</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員大會 / 活動紀錄</div>'}</div>`;
+  const sections = ASSOCIATIONS.map(a => {
+    const campaignRows = associationCampaigns(a.id).map(c => {
+      const eventStatus = c.status === '結案' ? '已完成' : (c.status === '預計規劃' ? '待確認' : '準備中');
+      const date = c.actual_start || c.planned_start;
+      return `<tr onclick="campaignDetail('${c.id}')">
+        <td><div class="cell-main clamp2">${esc(c.name)}</div><div class="cell-sub">行銷案同步｜點選查看專案說明</div></td>
+        <td class="status-col"><span class="case-tag">${esc(c.association_activity_type || '公會活動')}</span><div style="margin-top:6px">${simpleStatusTag(eventStatus)}</div></td>
+        <td><div class="cell-main">${fdFull(date || '')}</div><div class="cell-sub clamp2">${esc(c.owner_unit || '-')}</div></td>
+        <td><div class="cell-main">${esc(c.association_activity_type === '年度贊助' ? '贊助' : '會員參與')}</div><div class="cell-sub clip">${esc(c.owner || '-')}</div></td>
+        <td class="money-col"><div class="mono">預算 ${fmt(c.budget)}</div><div class="cell-sub">實支 ${fmt(c.actual_spend)}</div></td>
+      </tr>`;
+    }).join('');
+    const nativeRows = ASSOC_EVENTS.filter(e => e.association_id === a.id).map(e => `<tr onclick="openAssocEventModal('${e.id}')">
+      <td><div class="cell-main clamp2">${esc(e.event_name)}</div><div class="cell-sub">公會專屬活動｜${esc(taskName(e.task_id))}</div></td>
+      <td class="status-col"><span class="case-tag">${esc(e.event_type)}</span><div style="margin-top:6px">${simpleStatusTag(e.event_status)}</div></td>
+      <td><div class="cell-main">${fdFull(e.event_date || '')}</div><div class="cell-sub clamp2">${esc(e.location || '-')}</div></td>
+      <td><div class="cell-main">${esc(e.meisun_role || '-')}</div><div class="cell-sub clip">${esc(e.owner || '-')}</div></td>
+      <td class="money-col"><div class="mono">預算 ${fmt(e.budget)}</div><div class="cell-sub">實支 ${fmt(e.actual_spend)}</div></td>
+    </tr>`).join('');
+    const rows = campaignRows + nativeRows;
+    return `<div class="card" style="margin-bottom:16px">
+      <div class="dash-panel-head">
+        <div><div class="dash-panel-title">${esc(a.name)}</div><div class="muted-text">會員大會、協辦、贊助與講座以行銷案為主彙整</div></div>
+      </div>
+      <div class="tw"><table class="assoc-table"><thead><tr><th>行銷案 / 活動</th><th class="status-col">類型 / 狀態</th><th>日期 / 地點</th><th>角色 / 負責</th><th class="money-col">費用</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無關聯行銷案或會員大會 / 活動紀錄</div>'}</div>
+    </div>`;
+  }).join('');
+  return sections || '<div class="empty">尚無會員大會 / 活動紀錄</div>';
 }
 
 function openAssociationModal(id){
