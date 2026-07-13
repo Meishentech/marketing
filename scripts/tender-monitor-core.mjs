@@ -89,7 +89,7 @@ export async function scanProject(options) {
     let checkedPages = 0;
     let searchDiagnostics = null;
     if (project.scan_mode === '主動找案') {
-      searchDiagnostics = { source: '政府採購網', queries: [], returned: 0, totalResults: 0, errors: [] };
+      searchDiagnostics = { source: '政府採購網 + 台灣採購公報網', queries: [], returned: 0, totalResults: 0, errors: [] };
       for (const item of await activeSearchCandidates({
         project,
         words,
@@ -122,7 +122,8 @@ export async function scanProject(options) {
       }
 
       const detailText = htmlToText(detailHtml);
-      const title = cleanText(extractTitle(detailHtml) || item.title);
+      const extractedTitle = cleanText(extractTitle(detailHtml));
+      const title = usableDetailTitle(extractedTitle, detailText) ? extractedTitle : cleanText(item.title);
       const haystack = `${title}\n${item.pageText || ''}\n${detailText}`;
       const matchedKeywords = words.filter(w => haystack.includes(w));
       const relevance = evaluateTenderRelevance({
@@ -292,19 +293,54 @@ export function extractScanCandidates(html, baseUrl, maxLinks = 80) {
 }
 
 async function activeSearchCandidates({ project, words, maxCandidates = 30, requestLimit = ACTIVE_SEARCH_REQUEST_LIMIT, diagnostics }) {
-  const rows = [];
-  for (const item of await pccTenderCandidates({
+  const pccRows = await pccTenderCandidates({
     project,
     words,
     maxCandidates,
     requestLimit,
     diagnostics
-  })) {
-    rows.push(item);
-    if (rows.length >= maxCandidates) return dedupeCandidates(rows).slice(0, maxCandidates);
-  }
+  });
+  const taiwanBuyingRows = await taiwanBuyingTenderCandidates({
+    project,
+    words,
+    maxCandidates,
+    requestLimit,
+    diagnostics
+  });
 
-  return dedupeCandidates(rows).slice(0, maxCandidates);
+  return dedupeActiveCandidates(interleaveCandidateGroups([pccRows, taiwanBuyingRows])).slice(0, maxCandidates);
+}
+
+function interleaveCandidateGroups(groups) {
+  const rows = [];
+  const maxLength = Math.max(0, ...groups.map(group => group.length));
+  for (let i = 0; i < maxLength; i++) {
+    for (const group of groups) {
+      if (group[i]) rows.push(group[i]);
+    }
+  }
+  return rows;
+}
+
+function dedupeActiveCandidates(items) {
+  const seenUrls = new Set();
+  const seenTitles = new Set();
+  const rows = [];
+  for (const item of items) {
+    const url = normalizeCandidateUrl(item.url);
+    const titleKey = candidateTitleKey(item.title);
+    if (seenUrls.has(url)) continue;
+    if (titleKey && seenTitles.has(titleKey)) continue;
+    seenUrls.add(url);
+    if (titleKey) seenTitles.add(titleKey);
+    rows.push({ ...item, url });
+  }
+  return rows;
+}
+
+function candidateTitleKey(title) {
+  const core = cleanText(String(title || '').split(/[:：]/).pop() || title);
+  return core.replace(/[「」"'\s\-–—_()（）]/g, '').toLowerCase();
 }
 
 async function pccTenderCandidates({ project, words, maxCandidates, requestLimit, diagnostics }) {
@@ -332,6 +368,36 @@ async function pccTenderCandidates({ project, words, maxCandidates, requestLimit
     }
   }
   return candidates;
+}
+
+async function taiwanBuyingTenderCandidates({ project, words, maxCandidates, requestLimit, diagnostics }) {
+  const terms = pccSearchTerms(project, words);
+  const candidates = [];
+  let requestCount = 0;
+  for (const term of terms) {
+    if (candidates.length >= maxCandidates) break;
+    if (requestCount >= requestLimit) break;
+    diagnostics?.queries.push(`台灣採購公報網:${term}`);
+    const url = taiwanBuyingSearchUrl(term);
+    requestCount++;
+    let html = '';
+    try { html = await fetchHtml(url); }
+    catch (err) {
+      diagnostics?.errors.push(`台灣採購公報網讀取失敗：${String(err.message || err).slice(0, 80)}`);
+      continue;
+    }
+    const rows = parseTaiwanBuyingRows(html, url, term).slice(0, maxCandidates - candidates.length);
+    diagnostics.returned += rows.length;
+    diagnostics.totalResults += rows.length;
+    candidates.push(...rows);
+  }
+  return candidates;
+}
+
+function taiwanBuyingSearchUrl(term) {
+  const url = new URL('https://www.taiwanbuying.com.tw/Query_KeywordAction.ASP');
+  url.searchParams.set('keyword', term);
+  return url.toString();
 }
 
 function pccTenderSearchUrl(term) {
@@ -430,6 +496,40 @@ function parsePccTenderRows(html, baseUrl, query) {
     });
   }
   return rows;
+}
+
+function parseTaiwanBuyingRows(html, baseUrl, query) {
+  const rows = [];
+  const itemRe = /<a\b[^>]*href\s*=\s*["']?javascript:openWin\('([^']+)'\)["']?[^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = itemRe.exec(html))) {
+    const detailPath = decodeHtml(match[1]);
+    if (!/Show(?:Detail|PRQDetail|PRWDetail)\.ASP\?RecNo=\d+/i.test(detailPath)) continue;
+    const linkText = cleanText(htmlToText(match[2]));
+    if (!linkText) continue;
+    const date = linkText.match(/\((\d{4}\/\d{1,2}\/\d{1,2})(?:\s*更新)?\)\s*$/)?.[1] || '';
+    const title = cleanText(linkText.replace(/\s*\(\d{4}\/\d{1,2}\/\d{1,2}(?:\s*更新)?\)\s*$/, ''));
+    const noticeType = taiwanBuyingNoticeType(detailPath);
+    const url = normalizeCandidateUrl(new URL(detailPath, baseUrl).toString());
+    rows.push({
+      title,
+      url,
+      pageText: cleanText([
+        '台灣採購公報網',
+        `查詢:${query}`,
+        noticeType,
+        title,
+        date ? `公告日期:${date}` : ''
+      ].join(' '))
+    });
+  }
+  return rows;
+}
+
+function taiwanBuyingNoticeType(detailPath) {
+  if (/ShowPRQDetail/i.test(detailPath)) return '公開徵求公告';
+  if (/ShowPRWDetail/i.test(detailPath)) return '公開閱覽公告';
+  return '招標公告';
 }
 
 function extractPccTenderTitle(rowHtml, titleCell) {
@@ -650,6 +750,13 @@ function extractTitle(html) {
   if (h1) return htmlToText(h1);
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
   return title ? htmlToText(title).split('|')[0] : '';
+}
+
+function usableDetailTitle(title, detailText) {
+  if (!title) return false;
+  if (/^(台灣採購公報網|政府電子採購網|採購資訊|登入)/.test(title)) return false;
+  if (/登入「台灣採購公報網」|會員帳號|LoginAction\.asp/.test(detailText || '')) return false;
+  return true;
 }
 
 function extractPublishedDate(text) {
