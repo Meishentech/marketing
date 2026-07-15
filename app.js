@@ -353,6 +353,142 @@ function subsidyStateTag(c){
   return '<span class="tag tag-muted">待補</span>';
 }
 
+function campaignOverviewYear(campaigns){
+  const current = new Date().getFullYear();
+  const years = campaigns
+    .map(campaignFiscalYear)
+    .filter(y => Number.isFinite(y));
+  if (!years.length || years.includes(current)) return current;
+  return Math.max(...years);
+}
+
+function campaignHalf(c){
+  const raw = c.actual_start || c.planned_start || c.created_at || todayISO();
+  const month = Number(String(raw).slice(5, 7)) || 1;
+  return month <= 6 ? 'h1' : 'h2';
+}
+
+function campaignStartDate(c){
+  return c.actual_start || c.planned_start || c.created_at || '';
+}
+
+function campaignBudgetItems(campaignId){
+  return CAMPAIGN_BUDGET_ITEMS_ALL.filter(b => b.campaign_id === campaignId);
+}
+
+function campaignTasks(campaignId){
+  return CAMPAIGN_TASKS_ALL.filter(t => t.campaign_id === campaignId);
+}
+
+function campaignPlannedBudget(c, budgetItems = campaignBudgetItems(c.id)){
+  const direct = Number(c.budget) || 0;
+  if (direct) return direct;
+  return budgetItems.reduce((sum, item) => sum + (Number(item.amount_twd) || 0), 0);
+}
+
+function campaignBudgetAmount(c){
+  return Number(c.budget) || 0;
+}
+
+function campaignEstimatedSpend(c, budgetItems = campaignBudgetItems(c.id)){
+  const itemTotal = budgetItems.reduce((sum, item) => sum + (Number(item.amount_twd) || 0), 0);
+  return itemTotal || campaignBudgetAmount(c);
+}
+
+function campaignProgressPct(c, tasks = campaignTasks(c.id)){
+  if (tasks.length) {
+    const total = tasks.reduce((sum, t) => sum + Math.max(0, Math.min(100, Number(t.completion_pct) || 0)), 0);
+    return Math.round(total / tasks.length);
+  }
+  if (c.status === '結案') return 100;
+  if (c.status === '補助申請') return 85;
+  if (c.status === '進行中') return 60;
+  if (c.status === '估價中') return 35;
+  if (c.status === '預計規劃') return 15;
+  return 30;
+}
+
+function renderCampaignProgress(pct){
+  const safe = Math.max(0, Math.min(100, Number(pct) || 0));
+  const cls = safe >= 100 ? ' is-done' : safe < 45 ? ' is-low' : '';
+  return `<div class="progress-line"><div class="progress-bar${cls}"><i style="width:${safe}%"></i></div><span class="progress-num">${safe}%</span></div>`;
+}
+
+function campaignNextAction(c, tasks = campaignTasks(c.id), budgetItems = campaignBudgetItems(c.id)){
+  const openTasks = tasks.filter(t => t.status !== '已完成');
+  const overdue = openTasks.filter(t => isPast(t.planned_end || t.planned_start));
+  const pending = openTasks.filter(t => t.status === '待確認');
+  const pendingQuotes = budgetItems.filter(b => /待|估算/.test(`${b.quote_status || ''}${b.budget_nature || ''}`));
+  const next = [...openTasks].sort((a, b) => String(a.planned_end || a.planned_start || '9999').localeCompare(String(b.planned_end || b.planned_start || '9999')))[0];
+  if (overdue.length) return `${overdue.length} 項任務逾期`;
+  if (pending.length) return `${pending.length} 項任務待確認`;
+  if (pendingQuotes.length) return `${pendingQuotes.length} 項預算待報價/核定`;
+  if (!campaignPlannedBudget(c, budgetItems)) return '預算待補';
+  if (next) return `${next.task_name}｜${fdFull(next.planned_end || next.planned_start)}`;
+  if (c.status !== '結案') return c.purpose || c.notes || '待補下一步';
+  return '已結案';
+}
+
+function campaignPeriodSummary(campaigns, half, year){
+  const rows = campaigns.filter(c => campaignFiscalYear(c) === year && campaignHalf(c) === half);
+  const budget = rows.reduce((sum, c) => sum + campaignBudgetAmount(c), 0);
+  const estimatedSpend = rows.reduce((sum, c) => sum + campaignEstimatedSpend(c), 0);
+  const spend = rows.reduce((sum, c) => sum + (Number(c.actual_spend) || 0), 0);
+  const subsidyPlanned = rows.reduce((sum, c) => sum + (Number(c.subsidy_planned) || 0), 0);
+  const subsidyReceived = rows.reduce((sum, c) => sum + (Number(c.subsidy_received) || 0), 0);
+  return { rows, budget, estimatedSpend, spend, subsidyPlanned, subsidyReceived };
+}
+
+function campaignSummaryBlocks(campaigns){
+  const year = campaignOverviewYear(campaigns);
+  const h1 = campaignPeriodSummary(campaigns, 'h1', year);
+  const h2 = campaignPeriodSummary(campaigns, 'h2', year);
+  const total = {
+    rows: [...h1.rows, ...h2.rows],
+    budget: h1.budget + h2.budget,
+    estimatedSpend: h1.estimatedSpend + h2.estimatedSpend,
+    spend: h1.spend + h2.spend,
+    subsidyPlanned: h1.subsidyPlanned + h2.subsidyPlanned,
+    subsidyReceived: h1.subsidyReceived + h2.subsidyReceived
+  };
+  const row = (label, summary, strong = false) => `
+    <tr class="${strong ? 'campaign-summary-total' : ''}">
+      <td class="tb-name">${esc(label)}</td>
+      <td class="mono tb-amt">NT$ ${fmt(summary.budget)}</td>
+      <td class="mono">${fmt(summary.rows.length)}</td>
+      <td class="mono tb-amt">NT$ ${fmt(summary.estimatedSpend)}</td>
+      <td class="mono tb-amt">NT$ ${fmt(summary.spend)}</td>
+      <td class="mono tb-amt">NT$ ${fmt(summary.subsidyPlanned)}</td>
+      <td class="mono tb-amt">NT$ ${fmt(summary.subsidyReceived)}</td>
+    </tr>`;
+
+  return `
+    <div class="tw campaign-summary-table">
+      <table>
+        <thead><tr><th>期間</th><th>預算</th><th>專案數量</th><th>預估支出</th><th>總實際支出</th><th>預估補助款</th><th>實撥補助款</th></tr></thead>
+        <tbody>
+          ${row(`${year} 上半年`, h1)}
+          ${row(`${year} 下半年`, h2)}
+          ${row(`${year} 總年度`, total, true)}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function sortCampaignsByHalfThenStart(list){
+  return [...list].sort((a, b) => {
+    const ay = campaignFiscalYear(a);
+    const by = campaignFiscalYear(b);
+    if (ay !== by) return by - ay;
+    const ah = campaignHalf(a) === 'h1' ? 0 : 1;
+    const bh = campaignHalf(b) === 'h1' ? 0 : 1;
+    if (ah !== bh) return ah - bh;
+    const ds = String(campaignStartDate(a)).localeCompare(String(campaignStartDate(b)));
+    if (ds !== 0) return ds;
+    return campaignSortRank(a, Number.MAX_SAFE_INTEGER) - campaignSortRank(b, Number.MAX_SAFE_INTEGER);
+  });
+}
+
 // ── DASHBOARD ──
 async function renderDashboard(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
@@ -598,43 +734,33 @@ async function loadCampaignsForManagement(){
 }
 async function renderCampaignsPage(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
-  const [data, associations] = await Promise.all([
+  const [data, associations, tasks, budgetItems] = await Promise.all([
     loadCampaignsForManagement(),
-    safeGET('associations?order=name.asc')
+    safeGET('associations?order=name.asc'),
+    safeGET('marketing_campaign_tasks?select=id,campaign_id,seq,task_name,owner,planned_start,planned_end,status,completion_pct,expected_output,notes&order=planned_end.asc,seq.asc'),
+    safeGET('marketing_campaign_budget_items?select=id,campaign_id,seq,item_name,budget_nature,amount_twd,amount_rmb,quote_status,basis_note&order=seq.asc,created_at.asc')
   ]);
   CAMPAIGNS = data || [];
   ASSOCIATIONS = associations || [];
+  CAMPAIGN_TASKS_ALL = tasks || [];
+  CAMPAIGN_BUDGET_ITEMS_ALL = budgetItems || [];
   _campaignView = 'list';
   _renderCampaignsBody();
 }
 
 function _renderCampaignsBody(){
   const isGantt = _campaignView === 'gantt';
-  const ordered = sortCampaignsManual(CAMPAIGNS);
-  const rows = ordered.map((c, i) => `
+  const ordered = sortCampaignsByHalfThenStart(CAMPAIGNS);
+  const rows = ordered.map(c => `
     <tr onclick="campaignDetail('${c.id}')">
-      <td class="order-col" style="width:58px;min-width:58px;padding-left:8px;padding-right:8px;text-align:center" onclick="event.stopPropagation()">
-        <div class="campaign-order" style="display:inline-flex;gap:3px;align-items:center;justify-content:center">
-          <button class="btn btn-outline campaign-order-btn" style="width:24px;height:24px;padding:0;border-radius:3px;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center" title="往上移" aria-label="往上移" onclick="moveCampaignSort('${c.id}', -1)" ${i === 0 || !campaignSortColumnReady ? 'disabled' : ''}>▲</button>
-          <button class="btn btn-outline campaign-order-btn" style="width:24px;height:24px;padding:0;border-radius:3px;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center" title="往下移" aria-label="往下移" onclick="moveCampaignSort('${c.id}', 1)" ${i === ordered.length - 1 || !campaignSortColumnReady ? 'disabled' : ''}>▼</button>
-        </div>
-      </td>
+      <td><span class="case-tag">${campaignHalf(c) === 'h1' ? '上半年' : '下半年'}</span><div class="cell-sub mono">${fdFull(campaignStartDate(c).slice(0, 10))}</div></td>
       <td class="tb-name">${esc(c.name)}${c.association_id ? `<div class="cell-sub">${esc(assocName(c.association_id))}${c.association_activity_type ? `｜${esc(c.association_activity_type)}` : ''}</div>` : ''}</td>
       <td>${tag(c.status)}</td>
       <td>${priorityTag(c.priority)}</td>
-      <td class="mono tb-amt">NT$ ${fmt(c.budget)}</td>
+      <td class="progress-cell">${renderCampaignProgress(campaignProgressPct(c))}</td>
+      <td class="mono tb-amt">NT$ ${fmt(campaignPlannedBudget(c))}</td>
+      <td><div class="cell-sub clamp2">${esc(campaignNextAction(c))}</div></td>
     </tr>`).join('');
-  const sortNotice = campaignSortColumnReady ? '' : `
-    <div class="card" style="margin-bottom:12px">
-      <div class="dash-panel-head">
-        <div>
-          <div class="dash-panel-title">尚未啟用手動排序</div>
-          <div class="muted-text">請先執行 ${CAMPAIGN_SORT_SQL_FILE}，之後就可以保存上移 / 下移的專案順序。</div>
-        </div>
-        <a class="btn btn-outline btn-sm" href="?sql=${CAMPAIGN_SORT_SQL_FILE}" target="_blank" rel="noopener">查看 SQL</a>
-      </div>
-    </div>`;
-
   document.getElementById('vc').innerHTML = `
     <div class="ph">
       <div><div class="pt">行銷案管理</div><div class="ps">共 ${CAMPAIGNS.length} 筆</div></div>
@@ -644,10 +770,10 @@ function _renderCampaignsBody(){
         <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>
       </div>
     </div>
-    ${sortNotice}
+    ${campaignSummaryBlocks(CAMPAIGNS)}
     <div id="campaign-list" style="${isGantt ? 'display:none' : ''}" class="tw">
       <table class="campaign-table">
-        <thead><tr><th class="order-col" style="width:58px;min-width:58px;padding-left:8px;padding-right:8px;text-align:center">排序</th><th>專案名稱 / 關聯公會</th><th>執行狀態</th><th>重要性</th><th>預算</th></tr></thead>
+        <thead><tr><th>期間 / 開始日</th><th>專案名稱 / 關聯公會</th><th>執行狀態</th><th>重要性</th><th>進度</th><th>預算</th><th>待處理</th></tr></thead>
         <tbody>${rows || ''}</tbody>
       </table>
       ${rows ? '' : '<div class="empty">尚無行銷案</div>'}

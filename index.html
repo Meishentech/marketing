@@ -147,6 +147,17 @@ nav{flex:1;padding:14px 0}
 .dash-mix-row .kpi-bar{background:var(--line);margin-top:6px}
 .dash-mix-label{display:flex;justify-content:space-between;gap:12px;font-size:14px;font-weight:600}
 .dash-mix-label span{color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap}
+.campaign-summary-table{margin-bottom:16px}
+.campaign-summary-table tbody tr{cursor:default}
+.campaign-summary-table tbody tr:hover td{background:transparent}
+.campaign-summary-total td{background:#F5F8F6;font-weight:700;border-top:2px solid var(--ink)}
+.progress-cell{min-width:120px}
+.progress-line{display:flex;align-items:center;gap:9px}
+.progress-bar{height:6px;flex:1;min-width:72px;background:var(--line);overflow:hidden}
+.progress-bar i{display:block;height:100%;background:var(--teal)}
+.progress-bar.is-low i{background:var(--brass)}
+.progress-bar.is-done i{background:var(--teal-deep)}
+.progress-num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);white-space:nowrap}
 
 /* status thermal tag */
 .tag{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
