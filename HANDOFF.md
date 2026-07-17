@@ -28,6 +28,7 @@
 - 時程圖（Gantt）toggle 切換（總表層級，畫的是專案起訖日一條橫槓，非任務層級）
 - 總表可「匯出 Excel」（CSV，Excel 可直接開，含新增的補助/請款欄位）
 - 狀態顏色沿用冷媒循環溫度隱喻：預計規劃(灰)/估價中(黃銅)/進行中(冷媒藍綠)/補助申請(鋼藍)/結案(深藍綠)
+- 2026-07-17 起，行銷案生命週期改由 v2 逐步接手。v1 已停用 `marketing_campaigns` 真刪除，避免觸發 v2 廠商合作 `marketing_campaign_vendors` 與交付物 `marketing_campaign_vendor_deliverables` 的二層 cascade；v1 仍保留新增 / 編輯，供任務、預算、文件、風險等子模組過渡期使用。
 
 ### 2. 行銷成效查詢
 - 新增獨立頁面「成效查詢」，不再塞進首頁 Dashboard，避免首頁資訊過載。

@@ -2980,11 +2980,7 @@ async function saveCampaign(){
 }
 
 async function delCampaign(){
-  if (!editCampaignId) return;
-  if (!confirm('確定刪除此行銷案？')) return;
-  await DEL(`marketing_campaigns?id=eq.${editCampaignId}`);
-  closeM('mcampaign');
-  await renderCampaignsPage();
+  alert('行銷案已改由 v2 管理生命週期。請到 v2 的「行銷案管理」使用封存，不再從 v1 真刪除。');
 }
 
 function csvCell(v){
