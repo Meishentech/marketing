@@ -1246,11 +1246,7 @@ async function saveTask(){
 }
 
 async function delTask(){
-  if (!editTaskId) return;
-  if (!confirm('確定刪除此任務？')) return;
-  await DEL(`marketing_campaign_tasks?id=eq.${editTaskId}`);
-  closeM('mtask');
-  await campaignDetail(detailCampaignId);
+  alert('任務刪除已停用。V2 已接手行銷案任務生命週期，後續請到 V2 以「取消」方式保留歷史紀錄。');
 }
 
 function openBudgetModal(id){
@@ -1290,11 +1286,7 @@ async function saveBudgetItem(){
 }
 
 async function delBudgetItem(){
-  if (!editBudgetItemId) return;
-  if (!confirm('確定刪除此預算項目？')) return;
-  await DEL(`marketing_campaign_budget_items?id=eq.${editBudgetItemId}`);
-  closeM('mbudget');
-  await campaignDetail(detailCampaignId);
+  alert('預算項目刪除已停用。V2 已接手行銷案預算生命週期，後續請到 V2 以「取消」方式保留歷史紀錄。');
 }
 
 function openRiskModal(id){

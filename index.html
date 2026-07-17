@@ -684,7 +684,7 @@ tbody tr:last-child td{border-bottom:none}
       </div>
     </div>
     <div class="mf">
-      <button class="btn btn-red" id="tm-delete" onclick="delTask()">刪除</button>
+      <button class="btn btn-red" id="tm-delete" disabled title="任務生命週期已改由 v2 取消，不再從 v1 刪除">刪除已停用</button>
       <button class="btn btn-outline" onclick="closeM('mtask')">取消</button>
       <button class="btn btn-primary" onclick="saveTask()">儲存</button>
     </div>
@@ -708,7 +708,7 @@ tbody tr:last-child td{border-bottom:none}
       </div>
     </div>
     <div class="mf">
-      <button class="btn btn-red" id="bm-delete" onclick="delBudgetItem()">刪除</button>
+      <button class="btn btn-red" id="bm-delete" disabled title="預算項目生命週期已改由 v2 取消，不再從 v1 刪除">刪除已停用</button>
       <button class="btn btn-outline" onclick="closeM('mbudget')">取消</button>
       <button class="btn btn-primary" onclick="saveBudgetItem()">儲存</button>
     </div>
