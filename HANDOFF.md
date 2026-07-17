@@ -1,7 +1,7 @@
 # 美昇舒適科技行銷平台 · 工作交接紀錄
 
 ## 最後更新
-- 日期：2026-07-11
+- 日期：2026-07-17
 - 執行裝置：M1（Claude Code / Codex）
 
 ## 部署與帳號資訊
@@ -41,6 +41,7 @@
 - 已支援檔案上傳/下載，使用 Supabase Storage bucket `marketing-resource-files`；上傳檔案大小上限 200MB。
 - 新增「對外素材」快速頁，只顯示 `is_external_usable = true` 的資源，供業務快速查詢與下載可提供客戶的素材。
 - 業務只需要查行銷相關資料時，可從此頁快速找到可對外提供的素材，不混入業務自己的商機管理平台。
+- 2026-07-17 起，資源庫管理改由 v2 逐步接手。v1 已停用 `marketing_resources` 真刪除，避免觸發 v2 知識庫關聯表 `product_knowledge_resource_links` 的 `on delete cascade`。v1 資源列表、Dashboard 可用素材與對外素材頁會排除 `deleted_at is not null` 的 v2 已封存資源。
 
 ### 4. Dashboard
 - 首頁已精簡成四塊：進行中專案、待決事項、近期成效、可用素材更新。

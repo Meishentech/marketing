@@ -498,7 +498,7 @@ async function renderDashboard(){
   const dashboardRisks = await safeGET('marketing_campaign_risks?select=id,campaign_id,risk_type,title,description,impact_level,owner,due_date,status,show_on_dashboard,resolution_note&order=due_date.asc,created_at.desc');
   const dashboardRiskUpdates = await safeGET('marketing_campaign_risk_updates?select=id,risk_id,update_note,updated_by,update_date,next_followup_date,is_important,created_at&order=update_date.desc,created_at.desc');
   const dashboardPerformance = await safeGET('marketing_campaign_performance?order=updated_at.desc');
-  const dashboardResources = await safeGET('marketing_resources?is_external_usable=eq.true&order=updated_at.desc');
+  const dashboardResources = await safeGET('marketing_resources?is_external_usable=eq.true&deleted_at=is.null&order=updated_at.desc');
   RISKS = dashboardRisks;
   RISK_UPDATES = dashboardRiskUpdates;
   const total = CAMPAIGNS.length;
@@ -1683,7 +1683,7 @@ function resourceFileAction(r){
 
 async function renderResourcesPage(load = true){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
-  if (load) RESOURCES = await safeGET('marketing_resources?order=updated_at.desc');
+  if (load) RESOURCES = await safeGET('marketing_resources?deleted_at=is.null&order=updated_at.desc');
   const types = Object.entries(RESOURCES.reduce((acc, r) => {
     acc[r.resource_type] = (acc[r.resource_type] || 0) + 1;
     return acc;
@@ -1791,7 +1791,7 @@ function resetResourceFilters(){
 
 async function renderExternalResourcesPage(){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
-  RESOURCES = await safeGET('marketing_resources?is_external_usable=eq.true&order=updated_at.desc');
+  RESOURCES = await safeGET('marketing_resources?is_external_usable=eq.true&deleted_at=is.null&order=updated_at.desc');
   const rows = RESOURCES.map(r => `
     <tr onclick="openResourceModal('${r.id}')">
       <td><span class="case-tag">${esc(r.resource_type)}</span></td>
@@ -1924,12 +1924,7 @@ async function saveResource(){
 }
 
 async function delResource(){
-  if (!editResourceId) return;
-  if (!confirm('確定刪除此行銷資源？')) return;
-  if (currentResourceFilePath) await deleteStorageFile('marketing-resource-files', currentResourceFilePath);
-  await DEL(`marketing_resources?id=eq.${editResourceId}`);
-  closeM('mresource');
-  await renderResourcesPage();
+  alert('行銷資源已改由 v2 管理。請到 v2 的「產品知識庫 / 文宣資源管理」使用封存，不再從 v1 真刪除。');
 }
 
 // ── ASSOCIATIONS ──
