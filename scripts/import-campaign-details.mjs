@@ -1,15 +1,16 @@
 // Import WBS tasks and budget items from the 2026 marketing plan Google Sheet.
 //
 // Usage:
-//   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/import-campaign-details.mjs --apply
+//   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/import-campaign-details.mjs --apply --allow-destructive-reimport
 // or:
-//   SUPABASE_URL=... SUPABASE_AUTH_EMAIL=... SUPABASE_AUTH_PASSWORD=... node scripts/import-campaign-details.mjs --apply
+//   SUPABASE_URL=... SUPABASE_AUTH_EMAIL=... SUPABASE_AUTH_PASSWORD=... node scripts/import-campaign-details.mjs --apply --allow-destructive-reimport
 //
 // Without --apply this runs as a dry-run and prints the matched campaigns.
 
 import fs from 'node:fs';
 
 const apply = process.argv.includes('--apply');
+const allowDestructiveReimport = process.argv.includes('--allow-destructive-reimport');
 const SB = process.env.SUPABASE_URL || readConfigConst('SB');
 const ANON_KEY = readConfigConst('KEY');
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -134,6 +135,10 @@ const SOURCE = [
 main().catch((err) => fail(err.message || String(err)));
 
 async function main() {
+  if (apply && !allowDestructiveReimport) {
+    fail('Refusing destructive re-import. This script DELETEs marketing_campaign_tasks and marketing_campaign_budget_items before rebuilding them. Re-run with --apply --allow-destructive-reimport only after confirming v2 lifecycle data will not be lost.');
+  }
+
   const token = SERVICE_KEY || await signIn();
   const campaigns = await sb('GET', 'marketing_campaigns?select=id,name,status,budget&order=name.asc', null, token);
   const matches = SOURCE.map((src) => ({ src, campaign: findCampaign(campaigns, src) }));
@@ -144,7 +149,7 @@ async function main() {
   }
 
   if (!apply) {
-    console.log('\nDry-run only. Re-run with --apply to replace existing task/budget detail rows.');
+    console.log('\nDry-run only. Re-run with --apply --allow-destructive-reimport to replace existing task/budget detail rows.');
     return;
   }
 

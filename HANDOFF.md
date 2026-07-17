@@ -29,6 +29,7 @@
 - 總表可「匯出 Excel」（CSV，Excel 可直接開，含新增的補助/請款欄位）
 - 狀態顏色沿用冷媒循環溫度隱喻：預計規劃(灰)/估價中(黃銅)/進行中(冷媒藍綠)/補助申請(鋼藍)/結案(深藍綠)
 - 2026-07-17 起，行銷案生命週期改由 v2 逐步接手。v1 已停用 `marketing_campaigns` 真刪除，避免觸發 v2 廠商合作 `marketing_campaign_vendors` 與交付物 `marketing_campaign_vendor_deliverables` 的二層 cascade；v1 仍保留新增 / 編輯，供任務、預算、文件、風險等子模組過渡期使用。
+- 2026-07-17 起，v1 已停用 `marketing_campaign_documents` 文件真刪除，避免刪除已被 v2 廠商合作引用的文件；`delDocument()` 不再送出 `DELETE`，也不再刪除 `campaign-documents` Storage 檔案。任務與預算刪除暫時保留，等 v2 Batch 13B 接手後再處理。
 
 ### 2. 行銷成效查詢
 - 新增獨立頁面「成效查詢」，不再塞進首頁 Dashboard，避免首頁資訊過載。
@@ -108,8 +109,8 @@
 
 ## 已知決策與限制
 - 2026-07-10 Codex 已完成 Google Sheet 細項匯入：`商業週刊` 與 `遠見雜誌` 兩個分頁合併寫入既有行銷案 `B2B預熱行銷規劃`；其餘分頁分別寫入 `7/31台北市冷凍空調公會`、`高雄市冷凍空調技師公會講座`、`11月重慶訪廠`、`12月感恩餐會`。讀回驗證結果：共 41 筆任務、23 筆預算明細；各案預算明細台幣合計分別為 B2B 1,359,500、台北公會 285,000、高雄公會 150,000、11月重慶 600,000、12月感恩餐會 300,000。
-- 本次匯入腳本保留於 `scripts/import-campaign-details.mjs`，預設 dry-run；如需重跑，使用 authenticated 帳密或 service role key 執行 `node scripts/import-campaign-details.mjs --apply`，會先清除這些行銷案既有任務/預算明細再重新匯入，避免重複資料。
-- 2026-07-10 Codex 已執行 `scripts/seed-exhibition-oct2026.mjs --apply`，補齊既有「10月空調展」行銷案：開國報價 6 類預算彙總、7 筆關鍵任務/里程碑、vendors 加入「開國有限公司」、上傳 4 份文件附件（開國報價單、攤位設計 v1/v2、大會參展申請表）。第一次上傳因 Supabase Storage object key 含中文被拒絕，已修正腳本改用 ASCII 安全檔名後重跑成功。讀回驗證：任務 7 筆、預算明細 6 筆、預算合計 NTD 1,371,867、文件 4 筆。
+- 本次匯入腳本保留於 `scripts/import-campaign-details.mjs`，預設 dry-run；此腳本已列為 legacy destructive import。如需重跑，除了 `--apply` 以外，必須再加 `--allow-destructive-reimport`，因為它會先清除這些行銷案既有任務 / 預算明細再重新匯入，可能破壞 v2 後續建立的生命週期資料。
+- 2026-07-10 Codex 已執行 `scripts/seed-exhibition-oct2026.mjs --apply`，補齊既有「10月空調展」行銷案：開國報價 6 類預算彙總、7 筆關鍵任務/里程碑、vendors 加入「開國有限公司」、上傳 4 份文件附件（開國報價單、攤位設計 v1/v2、大會參展申請表）。第一次上傳因 Supabase Storage object key 含中文被拒絕，已修正腳本改用 ASCII 安全檔名後重跑成功。讀回驗證：任務 7 筆、預算明細 6 筆、預算合計 NTD 1,371,867、文件 4 筆。此腳本也已列為 legacy destructive import；若需重跑，必須使用 `--apply --allow-destructive-reimport`，因為它會真刪除任務 / 預算 / 文件資料列並重新上傳文件。
 - **不做 Google Sheet 自動匯出**（尚未串接，需要 Google Sheets API service account 憑證，使用者尚未提供）
 - 文案自動生成**已改為使用者同意接受小額 Anthropic API 費用**（Claude Haiku，估計月費台幣幾十元等級），前提是「一律進草稿、絕不自動發布」的規則不可放寬
 - 每週文案排程若跑到「文章重複」會跳過該關鍵字，不會硬產出重複內容

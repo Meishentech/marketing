@@ -2,9 +2,9 @@
 // tasks/milestones, vendor, and document uploads (quotation, booth design v1/v2, exhibitor form).
 //
 // Usage:
-//   SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed-exhibition-oct2026.mjs --apply
+//   SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed-exhibition-oct2026.mjs --apply --allow-destructive-reimport
 // or:
-//   SUPABASE_AUTH_EMAIL=... SUPABASE_AUTH_PASSWORD=... node scripts/seed-exhibition-oct2026.mjs --apply
+//   SUPABASE_AUTH_EMAIL=... SUPABASE_AUTH_PASSWORD=... node scripts/seed-exhibition-oct2026.mjs --apply --allow-destructive-reimport
 //
 // Requires schema_v9_documents.sql to have been run first (marketing_campaign_documents table + bucket).
 // Without --apply this runs as a dry-run and only prints the matched campaign.
@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 
 const apply = process.argv.includes('--apply');
+const allowDestructiveReimport = process.argv.includes('--allow-destructive-reimport');
 const SB = process.env.SUPABASE_URL || readConfigConst('SB');
 const ANON_KEY = readConfigConst('KEY');
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,6 +75,10 @@ const DOCUMENTS = [
 main().catch((err) => fail(err.message || String(err)));
 
 async function main() {
+  if (apply && !allowDestructiveReimport) {
+    fail('Refusing destructive re-import. This script DELETEs marketing_campaign_tasks, marketing_campaign_budget_items, and marketing_campaign_documents before rebuilding them, then uploads files to campaign-documents. Re-run with --apply --allow-destructive-reimport only after confirming v2 lifecycle data will not be lost.');
+  }
+
   const token = SERVICE_KEY || await signIn();
   const campaigns = await sb('GET', 'marketing_campaigns?select=id,name,vendors', null, token);
   const campaign = findCampaign(campaigns);
@@ -82,7 +87,7 @@ async function main() {
   console.log(`Will insert ${BUDGET_ITEMS.length} budget items, ${TASKS.length} tasks, ${DOCUMENTS.length} documents, vendor "${VENDOR_NAME}"`);
 
   if (!apply) {
-    console.log('\nDry-run only. Re-run with --apply to write.');
+    console.log('\nDry-run only. Re-run with --apply --allow-destructive-reimport to write.');
     return;
   }
 

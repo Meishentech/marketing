@@ -1558,12 +1558,7 @@ async function saveDocument(){
 }
 
 async function delDocument(){
-  if (!editDocId) return;
-  if (!confirm('確定刪除此文件？')) return;
-  if (currentDocPath) await deleteStorageFile('campaign-documents', currentDocPath);
-  await DEL(`marketing_campaign_documents?id=eq.${editDocId}`);
-  closeM('mdoc');
-  await campaignDetail(detailCampaignId);
+  alert('文件刪除已停用。v2 廠商合作可能已引用行銷案文件，後續會改以封存方式管理，不會直接刪除資料或檔案。');
 }
 
 // ── PERFORMANCE ──
