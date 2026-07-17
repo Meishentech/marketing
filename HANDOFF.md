@@ -31,6 +31,7 @@
 - 2026-07-17 起，行銷案生命週期改由 v2 逐步接手。v1 已停用 `marketing_campaigns` 真刪除，避免觸發 v2 廠商合作 `marketing_campaign_vendors` 與交付物 `marketing_campaign_vendor_deliverables` 的二層 cascade；v1 仍保留新增 / 編輯，供任務、預算、文件、風險等子模組過渡期使用。
 - 2026-07-17 起，v1 已停用 `marketing_campaign_documents` 文件真刪除，避免刪除已被 v2 廠商合作引用的文件；`delDocument()` 不再送出 `DELETE`，也不再刪除 `campaign-documents` Storage 檔案。
 - 2026-07-17 起，v2 Batch 13B 已接手行銷案任務與預算項目的生命週期；v1 已停用 `delTask()` 與 `delBudgetItem()` 真刪除，後續請在 v2 以「取消」方式保留歷史紀錄。
+- 2026-07-18 起，v1 已停用 `marketing_campaign_risks` 與 `marketing_campaign_risk_updates` 真刪除；`delRisk()` 不再送出 `DELETE`，避免 cascade 清掉追蹤紀錄，`delRiskUpdate()` 也不再刪除單筆追蹤。後續由 v2 Batch 14B 以風險「封存」與追蹤「取消」保留歷史紀錄。
 
 ### 2. 行銷成效查詢
 - 新增獨立頁面「成效查詢」，不再塞進首頁 Dashboard，避免首頁資訊過載。

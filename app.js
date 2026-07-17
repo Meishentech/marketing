@@ -1330,7 +1330,7 @@ function renderRiskUpdates(riskId){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${u.is_important ? '<span class="tag tag-grant">重要</span>' : ''}
           <button class="btn btn-outline btn-sm" onclick="editRiskUpdate('${u.id}')">編輯</button>
-          <button class="btn btn-red btn-sm" onclick="delRiskUpdate('${u.id}')">刪除</button>
+          <button class="btn btn-red btn-sm" disabled title="追蹤紀錄將改由 V2 以取消方式保留歷史紀錄">刪除已停用</button>
         </div>
       </div>
       <div style="font-size:14px;line-height:1.6;margin-top:4px">${esc(u.update_note)}</div>
@@ -1385,13 +1385,7 @@ async function saveRiskUpdate(){
   openRiskModal(editRiskId);
 }
 async function delRiskUpdate(id){
-  if (!confirm('確定刪除此追蹤紀錄？')) return;
-  await DEL(`marketing_campaign_risk_updates?id=eq.${id}`);
-  const fresh = await safeGET(`marketing_campaign_risk_updates?risk_id=eq.${editRiskId}&order=update_date.desc,created_at.desc`);
-  RISK_UPDATES = RISK_UPDATES.filter(u => u.risk_id !== editRiskId).concat(fresh);
-  resetRiskUpdateForm();
-  renderRiskUpdates(editRiskId);
-  await campaignDetail(detailCampaignId);
+  alert('追蹤紀錄刪除已停用。後續會改由 V2 以「取消」方式保留歷史紀錄。');
 }
 
 function openQuickRiskModal(id){
@@ -1487,15 +1481,7 @@ async function saveRisk(){
 }
 
 async function delRisk(){
-  if (!editRiskId) return;
-  if (!confirm('確定刪除此風險／待決事項？')) return;
-  try { await DEL(`marketing_campaign_risks?id=eq.${editRiskId}`); }
-  catch (e) {
-    alert('風險與待決事項資料表尚未啟用，請先在 Supabase SQL Editor 執行 schema_v10_risks.sql。');
-    return;
-  }
-  closeM('mrisk');
-  await campaignDetail(detailCampaignId);
+  alert('風險／待決事項刪除已停用。V2 將接手風險生命週期，後續會以「封存」方式保留追蹤紀錄。');
 }
 
 function openDocModal(id){
