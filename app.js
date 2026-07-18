@@ -1601,6 +1601,8 @@ function openPerformanceModal(id){
   document.getElementById('pm-deal-amount').value = p?.deal_amount ?? 0;
   document.getElementById('pm-notes').value = p?.notes || '';
   document.getElementById('pm-delete').style.display = id ? '' : 'none';
+  document.getElementById('pm-delete').disabled = true;
+  document.getElementById('pm-delete').textContent = '刪除已停用';
   openM('mperformance');
 }
 
@@ -1629,11 +1631,7 @@ async function savePerformance(){
 }
 
 async function delPerformance(){
-  if (!editPerformanceId) return;
-  if (!confirm('確定刪除此成效資料？')) return;
-  await DEL(`marketing_campaign_performance?id=eq.${editPerformanceId}`);
-  closeM('mperformance');
-  await renderPerformancePage();
+  alert('成效資料刪除已停用，請改由 V2 後續的成效管理流程保留歷史資料。');
 }
 
 // ── RESOURCES ──
