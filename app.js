@@ -19,6 +19,14 @@ function fmtTaipeiDateTime(s){
   }).formatToParts(d).map(p => [p.type, p.value]));
   return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
+const V2_MANAGED_MESSAGE = '此功能已移至 V2，請至新版行銷管理平台操作。';
+function blockV2ManagedWrite(){
+  alert(V2_MANAGED_MESSAGE);
+  return true;
+}
+function v2MovedButton(label = '已移至 V2', classes = 'btn btn-primary'){
+  return `<button class="${classes}" disabled title="${esc(V2_MANAGED_MESSAGE)}">${esc(label)}</button>`;
+}
 
 // 狀態沿用冷媒循環的溫度隱喻：預計規劃＝尚未升溫（灰），估價中＝尚未啟動（黃銅），進行中＝正在冷卻（冷媒藍綠），補助申請＝行政作業（鋼藍），結案＝完全冷卻（深藍綠）
 const STATUS_ORDER = ['預計規劃', '估價中', '進行中', '補助申請', '結案'];
@@ -611,7 +619,7 @@ async function renderDashboard(){
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
         <div class="follow-badge">${esc(meta.label)}</div>
-        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openQuickRiskModal('${r.id}')">處理</button>
+        ${v2MovedButton('已移至 V2', 'btn btn-outline btn-sm')}
       </div>
     </div>`).join('') || '<div class="empty">目前沒有需追蹤的待決事項</div>';
   const categoryRows = categories.map(([name, amount]) => {
@@ -653,7 +661,7 @@ async function renderDashboard(){
 
   document.getElementById('vc').innerHTML = `
     <div class="ph"><div><div class="pt">經營總覽</div><div class="ps">進行中專案、待決事項、近期成效與可用素材</div></div>
-      <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button></div>
+      ${v2MovedButton()}</div>
     <div class="dash-kpi-grid">
       <div class="card dash-panel">
         <div class="dash-panel-head"><div><div class="kpi-label">進行中專案</div><div class="dash-panel-title">${CAMPAIGNS.filter(c => c.status !== '結案').length} 個未結案</div></div><button class="btn btn-outline btn-sm" onclick="nav('campaigns')">查看</button></div>
@@ -705,7 +713,7 @@ async function renderSubsidiesPage(){
   document.getElementById('vc').innerHTML = `
     <div class="ph">
       <div><div class="pt">補助管理</div><div class="ps">${year} 年美的補助申請、核發與尚未申請統整</div></div>
-      <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>
+      ${v2MovedButton()}
     </div>
     <div class="dash-kpi-grid">
       <div class="stat-box"><div class="kpi-label">實際申請補助專案</div><div class="stat-num mono">${summary.applied.length}</div></div>
@@ -767,7 +775,7 @@ function _renderCampaignsBody(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="exportCampaignsCSV()">匯出 Excel</button>
         <button class="btn btn-outline btn-sm" id="btn-gantt-toggle" onclick="toggleCampaignGantt()" style="${isGantt ? 'background:var(--ink);color:#fff;border-color:var(--ink)' : ''}">時程圖</button>
-        <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>
+        ${v2MovedButton()}
       </div>
     </div>
     ${campaignSummaryBlocks(CAMPAIGNS)}
@@ -783,6 +791,7 @@ function _renderCampaignsBody(){
 }
 
 async function moveCampaignSort(id, direction){
+  if (blockV2ManagedWrite()) return;
   if (!campaignSortColumnReady) {
     alert(`請先執行 ${CAMPAIGN_SORT_SQL_FILE} 啟用手動排序。`);
     return;
@@ -1108,7 +1117,7 @@ async function campaignDetail(id){
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-outline" onclick="openWeeklyReport()">產生週報</button>
-        <button class="btn btn-primary" onclick="openCampaignModal('${c.id}')">編輯</button>
+        ${v2MovedButton('已移至 V2')}
       </div>
     </div>
 
@@ -1172,7 +1181,7 @@ async function campaignDetail(id){
       <div class="card detail-block ff">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="kpi-label">風險與待決事項</div>
-          <button class="btn btn-outline btn-sm" onclick="openRiskModal()">＋ 新增事項</button>
+          ${v2MovedButton('已移至 V2', 'btn btn-outline btn-sm')}
         </div>
         ${renderRisksBlock(RISKS)}
       </div>
@@ -1180,7 +1189,7 @@ async function campaignDetail(id){
       <div class="card detail-block ff">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="kpi-label">任務與里程碑</div>
-          <button class="btn btn-outline btn-sm" onclick="openTaskModal()">＋ 新增任務</button>
+          ${v2MovedButton('已移至 V2', 'btn btn-outline btn-sm')}
         </div>
         ${renderTasksBlock(TASKS)}
       </div>
@@ -1188,7 +1197,7 @@ async function campaignDetail(id){
       <div class="card detail-block ff">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="kpi-label">預算明細</div>
-          <button class="btn btn-outline btn-sm" onclick="openBudgetModal()">＋ 新增項目</button>
+          ${v2MovedButton('已移至 V2', 'btn btn-outline btn-sm')}
         </div>
         ${renderBudgetItemsBlock(BUDGET_ITEMS)}
       </div>
@@ -1196,7 +1205,7 @@ async function campaignDetail(id){
       <div class="card detail-block ff">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="kpi-label">文件附件</div>
-          <button class="btn btn-outline btn-sm" onclick="openDocModal()">＋ 新增文件</button>
+          ${v2MovedButton('已移至 V2', 'btn btn-outline btn-sm')}
         </div>
         ${renderDocumentsBlock(docsWithUrl)}
       </div>
@@ -1204,6 +1213,7 @@ async function campaignDetail(id){
 }
 
 function openTaskModal(id){
+  if (blockV2ManagedWrite()) return;
   editTaskId = id || null;
   const t = id ? TASKS.find(x => x.id === id) : null;
   document.getElementById('tm-title').textContent = id ? '編輯任務' : '新增任務';
@@ -1225,6 +1235,7 @@ function openTaskModal(id){
 }
 
 async function saveTask(){
+  if (blockV2ManagedWrite()) return;
   const task_name = document.getElementById('tm-name').value.trim();
   if (!task_name) { alert('請輸入任務名稱'); return; }
   const payload = {
@@ -1250,6 +1261,7 @@ async function delTask(){
 }
 
 function openBudgetModal(id){
+  if (blockV2ManagedWrite()) return;
   editBudgetItemId = id || null;
   const b = id ? BUDGET_ITEMS.find(x => x.id === id) : null;
   document.getElementById('bm-title').textContent = id ? '編輯預算項目' : '新增預算項目';
@@ -1266,6 +1278,7 @@ function openBudgetModal(id){
 }
 
 async function saveBudgetItem(){
+  if (blockV2ManagedWrite()) return;
   const item_name = document.getElementById('bm-name').value.trim();
   if (!item_name) { alert('請輸入費用項目'); return; }
   const payload = {
@@ -1290,6 +1303,7 @@ async function delBudgetItem(){
 }
 
 function openRiskModal(id){
+  if (blockV2ManagedWrite()) return;
   editRiskId = id || null;
   const r = id ? RISKS.find(x => x.id === id) : null;
   const latest = r ? latestRiskUpdate(r.id) : null;
@@ -1329,7 +1343,7 @@ function renderRiskUpdates(riskId){
         <div class="mono" style="font-size:12px;color:var(--muted)">${fdFull(u.update_date)}${u.updated_by ? ' · ' + esc(u.updated_by) : ''}</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${u.is_important ? '<span class="tag tag-grant">重要</span>' : ''}
-          <button class="btn btn-outline btn-sm" onclick="editRiskUpdate('${u.id}')">編輯</button>
+          ${v2MovedButton('已移至 V2', 'btn btn-outline btn-sm')}
           <button class="btn btn-red btn-sm" disabled title="追蹤紀錄將改由 V2 以取消方式保留歷史紀錄">刪除已停用</button>
         </div>
       </div>
@@ -1348,6 +1362,7 @@ function resetRiskUpdateForm(){
   document.getElementById('rm-update-cancel').style.display = 'none';
 }
 function editRiskUpdate(id){
+  if (blockV2ManagedWrite()) return;
   const u = RISK_UPDATES.find(x => x.id === id);
   if (!u) return;
   editRiskUpdateId = id;
@@ -1360,6 +1375,7 @@ function editRiskUpdate(id){
   document.getElementById('rm-update-cancel').style.display = '';
 }
 async function saveRiskUpdate(){
+  if (blockV2ManagedWrite()) return;
   if (!editRiskId) return;
   const note = document.getElementById('rm-update-note').value.trim();
   if (!note) { alert('請輸入更新內容'); return; }
@@ -1389,6 +1405,7 @@ async function delRiskUpdate(id){
 }
 
 function openQuickRiskModal(id){
+  if (blockV2ManagedWrite()) return;
   quickRiskId = id;
   const r = RISKS.find(x => x.id === id);
   if (!r) return;
@@ -1407,6 +1424,7 @@ function openQuickRiskModal(id){
 }
 
 async function saveQuickRisk(){
+  if (blockV2ManagedWrite()) return;
   if (!quickRiskId) return;
   const note = document.getElementById('qr-note').value.trim();
   const status = document.getElementById('qr-status').value;
@@ -1439,6 +1457,7 @@ async function saveQuickRisk(){
 }
 
 async function createRiskUpdate(riskId){
+  if (blockV2ManagedWrite()) return null;
   const note = document.getElementById('rm-update-note').value.trim();
   if (!note) return null;
   return POST('marketing_campaign_risk_updates', {
@@ -1452,6 +1471,7 @@ async function createRiskUpdate(riskId){
 }
 
 async function saveRisk(){
+  if (blockV2ManagedWrite()) return;
   const title = document.getElementById('rm-name').value.trim();
   if (!title) { alert('請輸入事項標題'); return; }
   const pendingUpdateNote = editRiskId ? document.getElementById('rm-update-note')?.value.trim() : '';
@@ -1485,6 +1505,7 @@ async function delRisk(){
 }
 
 function openDocModal(id){
+  if (blockV2ManagedWrite()) return;
   editDocId = id || null;
   const d = id ? DOCS.find(x => x.id === id) : null;
   document.getElementById('dc-title-label').textContent = id ? '編輯文件' : '新增文件';
@@ -1508,6 +1529,7 @@ function onDocFilePick(input){
 }
 
 async function saveDocument(){
+  if (blockV2ManagedWrite()) return;
   const title = document.getElementById('dc-name').value.trim();
   if (!title) { alert('請輸入文件名稱'); return; }
   if (!pendingDocFile && !currentDocPath) { alert('請選擇檔案'); return; }
@@ -1567,7 +1589,7 @@ async function renderPerformancePage(){
   }).join('');
   document.getElementById('vc').innerHTML = `
     <div class="ph"><div><div class="pt">成效查詢</div><div class="ps">用成效數字判斷活動是否值得持續投入</div></div>
-      <button class="btn btn-primary" onclick="openPerformanceModal()">＋ 新增成效</button></div>
+      ${v2MovedButton()}</div>
     <div class="dash-kpi-grid">
       <div class="stat-box"><div class="kpi-label">總名單數</div><div class="stat-num mono">${fmt(totalLeads)}</div></div>
       <div class="stat-box"><div class="kpi-label">有效商機</div><div class="stat-num mono">${fmt(totalQualified)}</div></div>
@@ -1588,6 +1610,7 @@ function performanceCampaignOptions(selected){
 }
 
 function openPerformanceModal(id){
+  if (blockV2ManagedWrite()) return;
   editPerformanceId = id || null;
   const p = id ? PERFORMANCE.find(x => x.id === id) : null;
   document.getElementById('pm-title').textContent = id ? '編輯成效' : '新增成效';
@@ -1607,6 +1630,7 @@ function openPerformanceModal(id){
 }
 
 async function savePerformance(){
+  if (blockV2ManagedWrite()) return;
   const payload = {
     campaign_id: document.getElementById('pm-campaign').value,
     reach_count: Number(document.getElementById('pm-reach').value) || 0,
@@ -1673,7 +1697,7 @@ async function renderResourcesPage(load = true){
     </tr>`).join('');
   document.getElementById('vc').innerHTML = `
     <div class="ph"><div><div class="pt">行銷資源庫</div><div class="ps">集中查詢簡報、DM、型錄、技術文章與可對外素材</div></div>
-      <button class="btn btn-primary" onclick="openResourceModal()">＋ 新增資源</button></div>
+      ${v2MovedButton()}</div>
     <div class="dash-kpi-grid">
       <div class="stat-box"><div class="kpi-label">資源總數</div><div class="stat-num mono">${RESOURCES.length}</div></div>
       <div class="stat-box"><div class="kpi-label">可對外使用</div><div class="stat-num mono">${RESOURCES.filter(r => r.is_external_usable).length}</div></div>
@@ -1790,6 +1814,7 @@ async function renderExternalResourcesPage(){
 }
 
 function openResourceModal(id){
+  if (blockV2ManagedWrite()) return;
   editResourceId = id || null;
   const r = id ? RESOURCES.find(x => x.id === id) : null;
   document.getElementById('res-title-label').textContent = id ? '編輯資源' : '新增資源';
@@ -1844,6 +1869,7 @@ async function downloadResourceFileFromButton(btn){
 }
 
 async function saveResource(){
+  if (blockV2ManagedWrite()) return;
   const title = document.getElementById('res-name').value.trim();
   if (!title) { alert('請輸入資源名稱'); return; }
   let filePath = currentResourceFilePath;
@@ -2124,8 +2150,7 @@ async function openCampaignBudgetFromAssoc(campaignId, itemId){
 function activeCampaignOptions(selected){
   const active = CAMPAIGNS.filter(c => c.status !== '結案' || c.id === selected);
   return '<option value="">不關聯行銷專案</option>' +
-    active.map(c => `<option value="${c.id}" ${selected === c.id ? 'selected' : ''}>${esc(c.name)}｜${esc(c.status || '未填')}</option>`).join('') +
-    `<option value="${NEW_CAMPAIGN_VALUE}">＋新增行銷專案</option>`;
+    active.map(c => `<option value="${c.id}" ${selected === c.id ? 'selected' : ''}>${esc(c.name)}｜${esc(c.status || '未填')}</option>`).join('');
 }
 function setCampaignSelect(id, selected){
   const el = document.getElementById(id);
@@ -2136,6 +2161,7 @@ function setCampaignSelect(id, selected){
 async function handleAssocCampaignSelect(){
   const el = document.getElementById('at-campaign');
   if (el.value !== NEW_CAMPAIGN_VALUE) { el.dataset.prevValue = el.value; return; }
+  if (blockV2ManagedWrite()) { el.value = el.dataset.prevValue || ''; return; }
   const name = (prompt('新增行銷專案名稱') || '').trim();
   if (!name) { el.value = el.dataset.prevValue || ''; return; }
   const payload = {
@@ -2275,11 +2301,11 @@ async function renderAssociationsPage(load = true){
   const actions = {
     overview: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
     details: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
-    tasks: '<button class="btn btn-outline" onclick="openAssocTaskModal()">＋ 公會專屬任務</button> <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>',
-    expenses: '<button class="btn btn-outline" onclick="openAssocExpenseModal()">＋ 公會專屬費用</button> <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>',
+    tasks: `<button class="btn btn-outline" onclick="openAssocTaskModal()">＋ 公會專屬任務</button> ${v2MovedButton()}`,
+    expenses: `<button class="btn btn-outline" onclick="openAssocExpenseModal()">＋ 公會專屬費用</button> ${v2MovedButton()}`,
     fees: '<button class="btn btn-primary" onclick="openAssocFeeModal()">＋ 新增年費</button>',
     publications: '<button class="btn btn-primary" onclick="openAssocPubModal()">＋ 新增期刊排程</button>',
-    events: '<button class="btn btn-outline" onclick="openAssocEventModal()">＋ 公會專屬活動</button> <button class="btn btn-primary" onclick="openCampaignModal()">＋ 新增行銷案</button>',
+    events: `<button class="btn btn-outline" onclick="openAssocEventModal()">＋ 公會專屬活動</button> ${v2MovedButton()}`,
     benefits: '<button class="btn btn-outline" onclick="openAssocNoteModal()">＋ 新增備註</button> <button class="btn btn-primary" onclick="openAssocBenefitModal()">＋ 新增權益</button>'
   }[ASSOC_TAB];
   document.getElementById('vc').innerHTML = `
@@ -2855,6 +2881,7 @@ function addVendorRow(){ vendorRows.push(''); renderVendorRows(); }
 function removeVendorRow(i){ vendorRows.splice(i, 1); renderVendorRows(); }
 
 async function openCampaignModal(id){
+  if (blockV2ManagedWrite()) return;
   if (!ASSOCIATIONS.length) ASSOCIATIONS = await safeGET('associations?order=name.asc');
   editCampaignId = id || null;
   let c = id ? CAMPAIGNS.find(x => x.id === id) : null;
@@ -2901,6 +2928,7 @@ async function openCampaignModal(id){
 }
 
 async function saveCampaign(){
+  if (blockV2ManagedWrite()) return;
   const name = document.getElementById('cm-name').value.trim();
   if (!name) { alert('請輸入專案名稱'); return; }
   const unitSel = document.getElementById('cm-unit').value;
