@@ -20,8 +20,13 @@ function fmtTaipeiDateTime(s){
   return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
 const V2_MANAGED_MESSAGE = '此功能已移至 V2，請至新版行銷管理平台操作。';
+const ASSOCIATION_DELETE_DISABLED_MESSAGE = '公會資料刪除已停用。公會管理將改由 V2 以封存 / 取消方式保留歷史紀錄，請勿再從 V1 真刪除。';
 function blockV2ManagedWrite(){
   alert(V2_MANAGED_MESSAGE);
+  return true;
+}
+function blockAssociationDelete(){
+  alert(ASSOCIATION_DELETE_DISABLED_MESSAGE);
   return true;
 }
 function v2MovedButton(label = '已移至 V2', classes = 'btn btn-primary'){
@@ -2588,11 +2593,7 @@ async function saveAssociation(){
   await renderAssociationsPage();
 }
 async function delAssociation(){
-  if (!editAssociationId) return;
-  if (!confirm('確定刪除此公會？相關年費、權益、期刊與活動紀錄也會刪除。')) return;
-  await DEL(`associations?id=eq.${editAssociationId}`);
-  closeM('massociation');
-  await renderAssociationsPage();
+  blockAssociationDelete();
 }
 
 function setAssocSelect(id, selected){ document.getElementById(id).innerHTML = assocSelectOptions(selected); }
@@ -2633,7 +2634,7 @@ async function saveAssocFee(){
   else await POST('association_fee_records', payload);
   closeM('massocfee'); ASSOC_TAB = 'fees'; await renderAssociationsPage();
 }
-async function delAssocFee(){ if (!editAssocFeeId || !confirm('確定刪除此年費紀錄？')) return; await DEL(`association_fee_records?id=eq.${editAssocFeeId}`); closeM('massocfee'); ASSOC_TAB = 'fees'; await renderAssociationsPage(); }
+async function delAssocFee(){ blockAssociationDelete(); }
 
 function openAssocBenefitModal(id){
   editAssocBenefitId = id || null;
@@ -2658,7 +2659,7 @@ async function saveAssocBenefit(){
   else await POST('association_benefits', payload);
   closeM('massocbenefit'); ASSOC_TAB = 'benefits'; await renderAssociationsPage();
 }
-async function delAssocBenefit(){ if (!editAssocBenefitId || !confirm('確定刪除此會員權益？')) return; await DEL(`association_benefits?id=eq.${editAssocBenefitId}`); closeM('massocbenefit'); ASSOC_TAB = 'benefits'; await renderAssociationsPage(); }
+async function delAssocBenefit(){ blockAssociationDelete(); }
 
 function openAssocTaskModal(id){
   editAssocTaskId = id || null;
@@ -2712,9 +2713,7 @@ async function saveAssocTask(){
   closeM('massoctask'); ASSOC_TAB = 'tasks'; await renderAssociationsPage();
 }
 async function delAssocTask(){
-  if (!editAssocTaskId || !confirm('確定刪除此公會任務？相關費用會保留但解除任務關聯。')) return;
-  await DEL(`association_tasks?id=eq.${editAssocTaskId}`);
-  closeM('massoctask'); ASSOC_TAB = 'tasks'; await renderAssociationsPage();
+  blockAssociationDelete();
 }
 
 function openAssocExpenseModal(id){
@@ -2756,9 +2755,7 @@ async function saveAssocExpense(){
   closeM('massocexpense'); ASSOC_TAB = 'expenses'; await renderAssociationsPage();
 }
 async function delAssocExpense(){
-  if (!editAssocExpenseId || !confirm('確定刪除此任務費用？')) return;
-  await DEL(`association_task_expenses?id=eq.${editAssocExpenseId}`);
-  closeM('massocexpense'); ASSOC_TAB = 'expenses'; await renderAssociationsPage();
+  blockAssociationDelete();
 }
 
 function openAssocPubModal(id){
@@ -2789,7 +2786,7 @@ async function saveAssocPub(){
   else await POST('association_publication_schedules', payload);
   closeM('massocpub'); ASSOC_TAB = 'publications'; await renderAssociationsPage();
 }
-async function delAssocPub(){ if (!editAssocPubId || !confirm('確定刪除此期刊排程？')) return; await DEL(`association_publication_schedules?id=eq.${editAssocPubId}`); closeM('massocpub'); ASSOC_TAB = 'publications'; await renderAssociationsPage(); }
+async function delAssocPub(){ blockAssociationDelete(); }
 
 function openAssocEventModal(id){
   editAssocEventId = id || null;
@@ -2821,7 +2818,7 @@ async function saveAssocEvent(){
   else await POST('association_events', payload);
   closeM('massocevent'); ASSOC_TAB = 'events'; await renderAssociationsPage();
 }
-async function delAssocEvent(){ if (!editAssocEventId || !confirm('確定刪除此活動？')) return; await DEL(`association_events?id=eq.${editAssocEventId}`); closeM('massocevent'); ASSOC_TAB = 'events'; await renderAssociationsPage(); }
+async function delAssocEvent(){ blockAssociationDelete(); }
 
 function openAssocNoteModal(id){
   editAssocNoteId = id || null;
@@ -2853,9 +2850,7 @@ async function saveAssocNote(){
   closeM('massocnote'); ASSOC_TAB = 'benefits'; await renderAssociationsPage();
 }
 async function delAssocNote(){
-  if (!editAssocNoteId || !confirm('確定刪除此備註附件？')) return;
-  await DEL(`association_notes?id=eq.${editAssocNoteId}`);
-  closeM('massocnote'); ASSOC_TAB = 'benefits'; await renderAssociationsPage();
+  blockAssociationDelete();
 }
 
 function distinctUnits(){

@@ -459,7 +459,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1"><label class="fl">內部負責人</label><input id="am-owner"></div>
       <div class="fg1 ff"><label class="fl">備註</label><textarea id="am-notes"></textarea></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="am-delete" onclick="delAssociation()">刪除</button><button class="btn btn-outline" onclick="closeM('massociation')">取消</button><button class="btn btn-primary" onclick="saveAssociation()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="am-delete" disabled title="公會資料已改由 V2 以封存 / 取消方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massociation')">取消</button><button class="btn btn-primary" onclick="saveAssociation()">儲存</button></div>
   </div>
 </div>
 
@@ -479,7 +479,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1 ff"><label class="fl">收據檔案或附件</label><input id="af-attachment" placeholder="附件連結、檔名或存放位置"></div>
       <div class="fg1 ff"><label class="fl">備註</label><textarea id="af-notes"></textarea></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="af-delete" onclick="delAssocFee()">刪除</button><button class="btn btn-outline" onclick="closeM('massocfee')">取消</button><button class="btn btn-primary" onclick="saveAssocFee()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="af-delete" disabled title="公會年費紀錄將改由 V2 以取消方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massocfee')">取消</button><button class="btn btn-primary" onclick="saveAssocFee()">儲存</button></div>
   </div>
 </div>
 
@@ -497,7 +497,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1 ff"><label class="fl">權益說明</label><textarea id="ab-desc"></textarea></div>
       <div class="fg1 ff"><label class="fl">備註</label><textarea id="ab-notes"></textarea></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="ab-delete" onclick="delAssocBenefit()">刪除</button><button class="btn btn-outline" onclick="closeM('massocbenefit')">取消</button><button class="btn btn-primary" onclick="saveAssocBenefit()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="ab-delete" disabled title="公會權益將改由 V2 以封存方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massocbenefit')">取消</button><button class="btn btn-primary" onclick="saveAssocBenefit()">儲存</button></div>
   </div>
 </div>
 
@@ -524,7 +524,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1 ff"><label class="fl">附件欄位</label><input id="at-attachment" placeholder="附件連結、檔名或存放位置"></div>
       <div class="fg1 ff"><label class="fl">備註</label><textarea id="at-notes"></textarea></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="at-delete" onclick="delAssocTask()">刪除</button><button class="btn btn-outline" onclick="closeM('massoctask')">取消</button><button class="btn btn-primary" onclick="saveAssocTask()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="at-delete" disabled title="公會任務將改由 V2 以取消方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massoctask')">取消</button><button class="btn btn-primary" onclick="saveAssocTask()">儲存</button></div>
   </div>
 </div>
 
@@ -544,7 +544,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1 ff"><label class="fl">收據檔案或附件</label><input id="ax-attachment" placeholder="附件連結、檔名或存放位置"></div>
       <div class="fg1 ff"><label class="fl">備註</label><textarea id="ax-notes"></textarea></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="ax-delete" onclick="delAssocExpense()">刪除</button><button class="btn btn-outline" onclick="closeM('massocexpense')">取消</button><button class="btn btn-primary" onclick="saveAssocExpense()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="ax-delete" disabled title="公會任務費用將改由 V2 以取消方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massocexpense')">取消</button><button class="btn btn-primary" onclick="saveAssocExpense()">儲存</button></div>
   </div>
 </div>
 
@@ -567,7 +567,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1 ff"><label class="fl">刊登成果備註</label><textarea id="ap-result"></textarea></div>
       <div class="fg1 ff"><label class="fl">附件</label><input id="ap-attachment" placeholder="附件連結、檔名或存放位置"></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="ap-delete" onclick="delAssocPub()">刪除</button><button class="btn btn-outline" onclick="closeM('massocpub')">取消</button><button class="btn btn-primary" onclick="saveAssocPub()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="ap-delete" disabled title="公會期刊排程將改由 V2 以取消方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massocpub')">取消</button><button class="btn btn-primary" onclick="saveAssocPub()">儲存</button></div>
   </div>
 </div>
 
@@ -592,7 +592,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1 ff"><label class="fl">活動成果</label><textarea id="ae-result" placeholder="名單、照片、商機、後續拜訪"></textarea></div>
       <div class="fg1 ff"><label class="fl">附件</label><input id="ae-attachment" placeholder="附件連結、檔名或存放位置"></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="ae-delete" onclick="delAssocEvent()">刪除</button><button class="btn btn-outline" onclick="closeM('massocevent')">取消</button><button class="btn btn-primary" onclick="saveAssocEvent()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="ae-delete" disabled title="公會活動將改由 V2 以取消方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massocevent')">取消</button><button class="btn btn-primary" onclick="saveAssocEvent()">儲存</button></div>
   </div>
 </div>
 
@@ -608,7 +608,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg1 ff"><label class="fl">附件欄位</label><input id="an-attachment" placeholder="附件連結、檔名或存放位置"></div>
       <div class="fg1 ff"><label class="fl">備註內容</label><textarea id="an-note"></textarea></div>
     </div></div>
-    <div class="mf"><button class="btn btn-red" id="an-delete" onclick="delAssocNote()">刪除</button><button class="btn btn-outline" onclick="closeM('massocnote')">取消</button><button class="btn btn-primary" onclick="saveAssocNote()">儲存</button></div>
+    <div class="mf"><button class="btn btn-red" id="an-delete" disabled title="公會備註將改由 V2 以取消方式保留歷史，不再從 V1 刪除">刪除已停用</button><button class="btn btn-outline" onclick="closeM('massocnote')">取消</button><button class="btn btn-primary" onclick="saveAssocNote()">儲存</button></div>
   </div>
 </div>
 
