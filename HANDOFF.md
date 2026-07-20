@@ -33,7 +33,7 @@
 - 2026-07-17 起，v2 Batch 13B 已接手行銷案任務與預算項目的生命週期；v1 已停用 `delTask()` 與 `delBudgetItem()` 真刪除，後續請在 v2 以「取消」方式保留歷史紀錄。
 - 2026-07-18 起，v1 已停用 `marketing_campaign_risks` 與 `marketing_campaign_risk_updates` 真刪除；`delRisk()` 不再送出 `DELETE`，避免 cascade 清掉追蹤紀錄，`delRiskUpdate()` 也不再刪除單筆追蹤。後續由 v2 Batch 14B 以風險「封存」與追蹤「取消」保留歷史紀錄。
 - 2026-07-18 起，v1 已停用 `marketing_campaign_performance` 成效資料真刪除；`delPerformance()` 不再送出 `DELETE`。v1 成效新增 / 編輯暫時保留到 v2 Batch 14C 完成成效管理驗收。
-- 2026-07-19 起，v2 已接手核心行銷資料管理，v1 對 8 張共用資料表的新增 / 編輯入口全面凍結：`marketing_resources`、`marketing_campaigns`、`marketing_campaign_tasks`、`marketing_campaign_budget_items`、`marketing_campaign_documents`、`marketing_campaign_risks`、`marketing_campaign_risk_updates`、`marketing_campaign_performance`。畫面按鈕改為停用，對應儲存 / 快速處理 / 行銷案排序函式即使從 console 直接呼叫，也只顯示「此功能已移至 V2，請至新版行銷管理平台操作。」並不送 API。v1 仍保留列表、詳情、下載、匯出等只讀查詢功能。
+- 2026-07-19 起，v2 已接手核心行銷資料管理，v1 對 8 張共用資料表的新增 / 編輯入口全面凍結：`marketing_resources`、`marketing_campaigns`、`marketing_campaign_tasks`、`marketing_campaign_budget_items`、`marketing_campaign_documents`、`marketing_campaign_risks`、`marketing_campaign_risk_updates`、`marketing_campaign_performance`。畫面按鈕改為停用，對應儲存 / 快速處理 / 行銷案排序函式即使從 console 直接呼叫，也只顯示「此功能已移至 V2，請至新版行銷管理平台操作。」並不送 API。v1 仍保留列表、下載、匯出等查詢功能；核心資料的新增、編輯與子項詳情請至 v2 查看與操作。
 
 ### 2. 行銷成效查詢
 - 新增獨立頁面「成效查詢」，不再塞進首頁 Dashboard，避免首頁資訊過載。
