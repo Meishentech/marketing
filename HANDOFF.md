@@ -1,7 +1,7 @@
 # 美昇舒適科技行銷平台 · 工作交接紀錄
 
 ## 最後更新
-- 日期：2026-07-19
+- 日期：2026-07-20
 - 執行裝置：M1（Claude Code / Codex）
 
 ## 部署與帳號資訊
@@ -35,6 +35,7 @@
 - 2026-07-18 起，v1 已停用 `marketing_campaign_performance` 成效資料真刪除；`delPerformance()` 不再送出 `DELETE`。v1 成效新增 / 編輯暫時保留到 v2 Batch 14C 完成成效管理驗收。
 - 2026-07-19 起，v2 已接手核心行銷資料管理，v1 對 8 張共用資料表的新增 / 編輯入口全面凍結：`marketing_resources`、`marketing_campaigns`、`marketing_campaign_tasks`、`marketing_campaign_budget_items`、`marketing_campaign_documents`、`marketing_campaign_risks`、`marketing_campaign_risk_updates`、`marketing_campaign_performance`。畫面按鈕改為停用，對應儲存 / 快速處理 / 行銷案排序函式即使從 console 直接呼叫，也只顯示「此功能已移至 V2，請至新版行銷管理平台操作。」並不送 API。v1 仍保留列表、下載、匯出等查詢功能；核心資料的新增、編輯與子項詳情請至 v2 查看與操作。
 - 2026-07-20 起，Batch 17A 先凍結 v1 公會模組 8 個真刪除入口：`associations`、`association_fee_records`、`association_benefits`、`association_tasks`、`association_task_expenses`、`association_publication_schedules`、`association_events`、`association_notes`。畫面刪除按鈕改為停用「刪除已停用」，`delAssociation()` / `delAssocFee()` / `delAssocBenefit()` / `delAssocTask()` / `delAssocExpense()` / `delAssocPub()` / `delAssocEvent()` / `delAssocNote()` 即使從 console 直接呼叫，也只顯示提示並不送 `DELETE`。v1 公會新增 / 編輯暫時保留，等 v2 公會 CRUD 完成後再全面凍結。
+- 2026-07-20 起，Batch 17G 已完成 v1 公會模組全面寫入凍結。`associations`、`association_fee_records`、`association_benefits`、`association_tasks`、`association_task_expenses`、`association_publication_schedules`、`association_events`、`association_notes` 的新增 / 編輯入口改為停用；`openAssociationModal()` / `saveAssociation()` / `openAssocFeeModal()` / `saveAssocFee()` / `openAssocBenefitModal()` / `saveAssocBenefit()` / `openAssocTaskModal()` / `saveAssocTask()` / `openAssocExpenseModal()` / `saveAssocExpense()` / `openAssocPubModal()` / `saveAssocPub()` / `openAssocEventModal()` / `saveAssocEvent()` / `openAssocNoteModal()` / `saveAssocNote()` 即使從 console 直接呼叫，也只顯示「此功能已移至 V2，請至新版行銷管理平台操作。」並不送 API。公會資料新增、編輯、取消、封存與歷史紀錄請改至 v2 操作；v1 保留列表查詢。
 
 ### 2. 行銷成效查詢
 - 新增獨立頁面「成效查詢」，不再塞進首頁 Dashboard，避免首頁資訊過載。

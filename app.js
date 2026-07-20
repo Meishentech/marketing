@@ -2304,14 +2304,14 @@ async function renderAssociationsPage(load = true){
   document.getElementById('vc').innerHTML = '<div class="loading">Loading</div>';
   if (load) await loadAssociationsData();
   const actions = {
-    overview: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
-    details: '<button class="btn btn-primary" onclick="openAssociationModal()">＋ 新增公會</button>',
-    tasks: `<button class="btn btn-outline" onclick="openAssocTaskModal()">＋ 公會專屬任務</button> ${v2MovedButton()}`,
-    expenses: `<button class="btn btn-outline" onclick="openAssocExpenseModal()">＋ 公會專屬費用</button> ${v2MovedButton()}`,
-    fees: '<button class="btn btn-primary" onclick="openAssocFeeModal()">＋ 新增年費</button>',
-    publications: '<button class="btn btn-primary" onclick="openAssocPubModal()">＋ 新增期刊排程</button>',
-    events: `<button class="btn btn-outline" onclick="openAssocEventModal()">＋ 公會專屬活動</button> ${v2MovedButton()}`,
-    benefits: '<button class="btn btn-outline" onclick="openAssocNoteModal()">＋ 新增備註</button> <button class="btn btn-primary" onclick="openAssocBenefitModal()">＋ 新增權益</button>'
+    overview: v2MovedButton('＋ 新增公會'),
+    details: v2MovedButton('＋ 新增公會'),
+    tasks: v2MovedButton('＋ 公會專屬任務', 'btn btn-outline'),
+    expenses: v2MovedButton('＋ 公會專屬費用', 'btn btn-outline'),
+    fees: v2MovedButton('＋ 新增年費'),
+    publications: v2MovedButton('＋ 新增期刊排程'),
+    events: v2MovedButton('＋ 公會專屬活動', 'btn btn-outline'),
+    benefits: `${v2MovedButton('＋ 新增備註', 'btn btn-outline')} ${v2MovedButton('＋ 新增權益')}`
   }[ASSOC_TAB];
   document.getElementById('vc').innerHTML = `
     <div class="ph"><div><div class="pt">公會管理</div><div class="ps">管理加入公會、年費續會、會員權益、期刊排程與會員大會/協辦活動</div></div>${actions}</div>
@@ -2377,7 +2377,7 @@ function renderAssocDetails(){
     <div class="card" style="margin-bottom:12px">
       <div class="dash-panel-head">
         <div><div class="dash-panel-title">${esc(a.name)}</div><div class="muted-text">${esc(a.association_type || '待補')}｜${assocStatusTag(a.join_status)}</div></div>
-        <button class="btn btn-sm btn-outline" onclick="openAssociationModal('${a.id}')">編輯</button>
+        ${v2MovedButton('編輯', 'btn btn-sm btn-outline')}
       </div>
       <div class="detail-grid">
         <div class="detail-block"><div class="kpi-label">會員編號</div><div>${esc(a.member_no || '待補')}</div></div>
@@ -2485,7 +2485,7 @@ function renderAssocBenefits(){
     <td class="date-col">${fdFull(n.updated_at?.slice(0, 10) || '')}</td>
   </tr>`).join('');
   return `<div class="card" style="margin-bottom:16px"><div class="dash-panel-head"><div><div class="dash-panel-title">會員權益</div><div class="muted-text">期刊曝光、活動參與、協辦活動、會員名錄與課程講座</div></div></div><div class="tw"><table class="assoc-table"><thead><tr><th>權益 / 公會</th><th class="status-col">類型 / 狀態</th><th class="date-col">有效期限</th><th class="owner-col">負責人</th><th>說明 / 備註</th></tr></thead><tbody>${rows}</tbody></table>${rows ? '' : '<div class="empty">尚無會員權益紀錄</div>'}</div></div>
-  <div class="card"><div class="dash-panel-head"><div><div class="dash-panel-title">備註與附件</div><div class="muted-text">記錄跨年度待補事項、雲端連結、檔名或附件存放位置</div></div><button class="btn btn-sm btn-primary" onclick="openAssocNoteModal()">＋ 新增備註</button></div><div class="tw"><table class="assoc-table"><thead><tr><th>備註 / 公會</th><th class="owner-col">負責人</th><th>附件欄位</th><th>備註內容</th><th class="date-col">最後更新</th></tr></thead><tbody>${noteRows}</tbody></table>${noteRows ? '' : '<div class="empty">尚無備註附件紀錄；若儲存時出現錯誤，請先執行 schema_v18_association_notes.sql</div>'}</div></div>`;
+  <div class="card"><div class="dash-panel-head"><div><div class="dash-panel-title">備註與附件</div><div class="muted-text">記錄跨年度待補事項、雲端連結、檔名或附件存放位置</div></div>${v2MovedButton('＋ 新增備註', 'btn btn-sm btn-primary')}</div><div class="tw"><table class="assoc-table"><thead><tr><th>備註 / 公會</th><th class="owner-col">負責人</th><th>附件欄位</th><th>備註內容</th><th class="date-col">最後更新</th></tr></thead><tbody>${noteRows}</tbody></table>${noteRows ? '' : '<div class="empty">尚無備註附件紀錄；若儲存時出現錯誤，請先執行 schema_v18_association_notes.sql</div>'}</div></div>`;
 }
 function renderAssocPublications(){
   const sections = ASSOCIATIONS.map(a => {
@@ -2549,6 +2549,7 @@ function renderAssocEvents(){
 }
 
 function openAssociationModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssociationId = id || null;
   const a = id ? assocById(id) : null;
   document.getElementById('am-title').textContent = id ? '編輯公會資料' : '新增公會';
@@ -2568,6 +2569,7 @@ function openAssociationModal(id){
   openM('massociation');
 }
 async function saveAssociation(){
+  if (blockV2ManagedWrite()) return;
   const name = document.getElementById('am-name').value.trim();
   if (!name) { alert('請輸入公會名稱'); return; }
   const payload = {
@@ -2600,6 +2602,7 @@ function setAssocSelect(id, selected){ document.getElementById(id).innerHTML = a
 function setAssocTaskSelect(id, associationId, selected){ document.getElementById(id).innerHTML = taskSelectOptions(associationId, selected); }
 function defaultAssocId(){ return ASSOCIATIONS[0]?.id || ''; }
 function openAssocFeeModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssocFeeId = id || null;
   const f = id ? ASSOC_FEES.find(x => x.id === id) : null;
   document.getElementById('af-title').textContent = id ? '編輯年費與續會' : '新增年費與續會';
@@ -2617,6 +2620,7 @@ function openAssocFeeModal(id){
   openM('massocfee');
 }
 async function saveAssocFee(){
+  if (blockV2ManagedWrite()) return;
   const payload = {
     association_id: document.getElementById('af-assoc').value,
     year: Number(document.getElementById('af-year').value) || new Date().getFullYear(),
@@ -2637,6 +2641,7 @@ async function saveAssocFee(){
 async function delAssocFee(){ blockAssociationDelete(); }
 
 function openAssocBenefitModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssocBenefitId = id || null;
   const b = id ? ASSOC_BENEFITS.find(x => x.id === id) : null;
   document.getElementById('ab-title').textContent = id ? '編輯會員權益' : '新增會員權益';
@@ -2652,6 +2657,7 @@ function openAssocBenefitModal(id){
   openM('massocbenefit');
 }
 async function saveAssocBenefit(){
+  if (blockV2ManagedWrite()) return;
   const name = document.getElementById('ab-name').value.trim();
   if (!name) { alert('請輸入權益名稱'); return; }
   const payload = { association_id: document.getElementById('ab-assoc').value, benefit_name: name, benefit_type: document.getElementById('ab-type').value, usage_status: document.getElementById('ab-status').value, valid_until: document.getElementById('ab-valid').value || null, owner: document.getElementById('ab-owner').value.trim() || null, description: document.getElementById('ab-desc').value.trim() || null, notes: document.getElementById('ab-notes').value.trim() || null, updated_at: new Date().toISOString() };
@@ -2662,6 +2668,7 @@ async function saveAssocBenefit(){
 async function delAssocBenefit(){ blockAssociationDelete(); }
 
 function openAssocTaskModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssocTaskId = id || null;
   const t = id ? ASSOC_TASKS.find(x => x.id === id) : null;
   document.getElementById('at-title').textContent = id ? '編輯公會任務' : '新增公會任務';
@@ -2685,6 +2692,7 @@ function openAssocTaskModal(id){
   openM('massoctask');
 }
 async function saveAssocTask(){
+  if (blockV2ManagedWrite()) return;
   const name = document.getElementById('at-name').value.trim();
   if (!name) { alert('請輸入任務名稱'); return; }
   const payload = {
@@ -2717,6 +2725,7 @@ async function delAssocTask(){
 }
 
 function openAssocExpenseModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssocExpenseId = id || null;
   const e = id ? ASSOC_EXPENSES.find(x => x.id === id) : null;
   const assocId = e?.association_id || defaultAssocId();
@@ -2735,6 +2744,7 @@ function openAssocExpenseModal(id){
   openM('massocexpense');
 }
 async function saveAssocExpense(){
+  if (blockV2ManagedWrite()) return;
   const payload = {
     association_id: document.getElementById('ax-assoc').value,
     task_id: document.getElementById('ax-task').value || null,
@@ -2759,6 +2769,7 @@ async function delAssocExpense(){
 }
 
 function openAssocPubModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssocPubId = id || null;
   const p = id ? ASSOC_PUBLICATIONS.find(x => x.id === id) : null;
   document.getElementById('ap-title').textContent = id ? '編輯期刊排程' : '新增期刊排程';
@@ -2779,6 +2790,7 @@ function openAssocPubModal(id){
   openM('massocpub');
 }
 async function saveAssocPub(){
+  if (blockV2ManagedWrite()) return;
   const name = document.getElementById('ap-name').value.trim();
   if (!name) { alert('請輸入期刊名稱'); return; }
   const payload = { association_id: document.getElementById('ap-assoc').value, task_id: document.getElementById('ap-task').value || null, publication_name: name, publish_date: document.getElementById('ap-publish').value || null, deadline_date: document.getElementById('ap-deadline').value || null, ad_spec: document.getElementById('ap-spec').value.trim() || null, topic: document.getElementById('ap-topic').value.trim() || null, required_materials: splitList(document.getElementById('ap-materials').value), material_status: document.getElementById('ap-status').value, owner: document.getElementById('ap-owner').value.trim() || null, submission_date: document.getElementById('ap-submit').value || null, result_notes: document.getElementById('ap-result').value.trim() || null, attachment: document.getElementById('ap-attachment').value.trim() || null, updated_at: new Date().toISOString() };
@@ -2789,6 +2801,7 @@ async function saveAssocPub(){
 async function delAssocPub(){ blockAssociationDelete(); }
 
 function openAssocEventModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssocEventId = id || null;
   const e = id ? ASSOC_EVENTS.find(x => x.id === id) : null;
   document.getElementById('ae-title').textContent = id ? '編輯會員大會 / 活動' : '新增會員大會 / 活動';
@@ -2811,6 +2824,7 @@ function openAssocEventModal(id){
   openM('massocevent');
 }
 async function saveAssocEvent(){
+  if (blockV2ManagedWrite()) return;
   const name = document.getElementById('ae-name').value.trim();
   if (!name) { alert('請輸入活動名稱'); return; }
   const payload = { association_id: document.getElementById('ae-assoc').value, task_id: document.getElementById('ae-task').value || null, event_name: name, event_type: document.getElementById('ae-type').value, event_date: document.getElementById('ae-date').value || null, location: document.getElementById('ae-location').value.trim() || null, organizer: document.getElementById('ae-organizer').value.trim() || null, meisun_role: document.getElementById('ae-role').value || null, budget: document.getElementById('ae-budget').value || null, actual_spend: document.getElementById('ae-spend').value || null, required_materials: splitList(document.getElementById('ae-materials').value), event_status: document.getElementById('ae-status').value, owner: document.getElementById('ae-owner').value.trim() || null, result_notes: document.getElementById('ae-result').value.trim() || null, attachment: document.getElementById('ae-attachment').value.trim() || null, updated_at: new Date().toISOString() };
@@ -2821,6 +2835,7 @@ async function saveAssocEvent(){
 async function delAssocEvent(){ blockAssociationDelete(); }
 
 function openAssocNoteModal(id){
+  if (blockV2ManagedWrite()) return;
   editAssocNoteId = id || null;
   const n = id ? ASSOC_NOTES.find(x => x.id === id) : null;
   document.getElementById('an-title').textContent = id ? '編輯備註附件' : '新增備註附件';
@@ -2833,6 +2848,7 @@ function openAssocNoteModal(id){
   openM('massocnote');
 }
 async function saveAssocNote(){
+  if (blockV2ManagedWrite()) return;
   const title = document.getElementById('an-name').value.trim();
   if (!title) { alert('請輸入備註標題'); return; }
   const payload = {
